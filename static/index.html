@@ -3,249 +3,291 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StarPulse — GitHub Trending Intelligence</title>
+  <title>StarPulse — GitHub & GitLab Trending Intelligence</title>
   <style>
     :root {
-      --bg: #0d1117;
-      --bg2: #161b22;
-      --bg3: #010409;
-      --border: #30363d;
-      --text: #e6edf3;
-      --muted: #8b949e;
-      --green: #3fb950;
-      --red: #f85149;
-      --blue: #58a6ff;
-      --orange: #f0883e;
-      --purple: #bc8cff;
-      --yellow: #e3b341;
-      --accent: #1f6feb;
+      --bg: #0d1117; --bg2: #161b22; --bg3: #010409;
+      --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+      --green: #3fb950; --red: #f85149; --blue: #58a6ff;
+      --orange: #f0883e; --purple: #bc8cff; --yellow: #e3b341;
+      --accent: #1f6feb; --gh: #f0f6fc; --gl: #fc6d26;
+      --gold: #e3b341; --silver: #8b949e; --bronze: #f0883e;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
-    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    html, body { height: 100%; overflow: hidden; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; }
 
-    /* ── Header ── */
+    /* ── HEADER ── */
     .hdr {
-      display: flex; align-items: center; gap: 14px;
-      padding: 10px 20px; background: var(--bg3);
-      border-bottom: 1px solid var(--border);
-      position: sticky; top: 0; z-index: 200; height: 48px;
+      height: 46px; display: flex; align-items: center; gap: 14px;
+      padding: 0 18px; background: var(--bg3); border-bottom: 1px solid var(--border);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 300;
     }
-    .logo { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-    .logo span { color: var(--yellow); }
+    .logo { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .logo .star { color: var(--gold); }
     .live { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: var(--green); letter-spacing: 0.8px; }
-    .dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: blink 2s ease-in-out infinite; }
-    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+    .dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.25} }
 
-    .search { flex: 1; max-width: 280px; position: relative; }
-    .search input {
-      width: 100%; background: var(--bg2); border: 1px solid var(--border);
-      color: var(--text); padding: 6px 12px 6px 32px; border-radius: 6px; font-size: 13px; outline: none;
+    .search-wrap { flex: 1; max-width: 260px; position: relative; }
+    .search-wrap input {
+      width: 100%; background: var(--bg2); border: 1px solid var(--border); color: var(--text);
+      padding: 5px 10px 5px 28px; border-radius: 6px; font-size: 12px; outline: none;
     }
-    .search input:focus { border-color: var(--blue); }
-    .search::before { content: '⌕'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
+    .search-wrap input:focus { border-color: var(--blue); }
+    .search-wrap::before { content:'⌕'; position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; font-size:13px; }
+
+    .platform-toggle { display: flex; gap: 4px; margin-left: 4px; }
+    .ptog {
+      display: flex; align-items: center; gap: 5px; padding: 4px 10px;
+      border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border); color: var(--muted); transition: all 0.15s;
+    }
+    .ptog.on.gh { border-color: var(--gh); color: var(--gh); background: rgba(240,246,252,0.07); }
+    .ptog.on.gl { border-color: var(--gl); color: var(--gl); background: rgba(252,109,38,0.08); }
 
     .hdr-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-    .btn {
-      background: var(--bg2); border: 1px solid var(--border); color: var(--muted);
-      padding: 5px 11px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.15s;
-    }
+    .count-pill { font-size: 11px; color: var(--muted); background: var(--bg2); border: 1px solid var(--border); padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
+    .count-pill b { color: var(--text); }
+    .btn { background: var(--bg2); border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.15s; }
     .btn:hover { border-color: var(--blue); color: var(--blue); }
-    .stat-pill { font-size: 11px; color: var(--muted); background: var(--bg2); border: 1px solid var(--border); padding: 4px 10px; border-radius: 12px; }
-    .stat-pill b { color: var(--text); }
 
-    /* ── Layout ── */
-    .layout { display: flex; height: calc(100vh - 48px); overflow: hidden; }
+    /* ── LAYOUT ── */
+    .layout { display: flex; position: fixed; top: 46px; bottom: 0; left: 0; right: 0; }
 
-    /* ── Sidebar ── */
-    .sb {
-      width: 190px; min-width: 190px; background: var(--bg3);
-      border-right: 1px solid var(--border); overflow-y: auto; padding: 10px 0;
-    }
-    .sb-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 10px 16px 4px; }
+    /* ── SIDEBAR ── */
+    .sb { width: 186px; min-width: 186px; background: var(--bg3); border-right: 1px solid var(--border); overflow-y: auto; padding: 8px 0; }
+    .sb-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: var(--muted); padding: 9px 14px 3px; }
     .sb-item {
-      display: flex; align-items: center; gap: 9px; padding: 8px 16px;
-      cursor: pointer; font-size: 13px; color: var(--muted);
-      transition: all 0.12s; border-left: 2px solid transparent;
+      display: flex; align-items: center; gap: 8px; padding: 7px 14px;
+      cursor: pointer; color: var(--muted); transition: all 0.12s;
+      border-left: 2px solid transparent; user-select: none;
     }
     .sb-item:hover { background: var(--bg2); color: var(--text); }
     .sb-item.active { color: var(--blue); background: rgba(88,166,255,0.07); border-left-color: var(--blue); font-weight: 600; }
-    .sb-item .ic { font-size: 14px; line-height: 1; }
-    .sb-count { margin-left: auto; font-size: 10px; color: var(--muted); background: var(--bg2); padding: 1px 6px; border-radius: 8px; }
+    .sb-item .ic { font-size: 13px; line-height: 1; flex-shrink: 0; }
+    .sb-item .label { flex: 1; }
+    .sb-item .cnt { font-size: 10px; color: var(--muted); background: var(--bg2); padding: 1px 5px; border-radius: 8px; }
 
-    /* ── Main ── */
+    /* ── MAIN ── */
     .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-    /* ── Period bar ── */
+    /* ── PERIOD BAR ── */
     .pbar {
-      display: flex; align-items: center; gap: 6px; padding: 10px 20px;
-      border-bottom: 1px solid var(--border); background: var(--bg); flex-shrink: 0;
+      display: flex; align-items: center; gap: 5px; padding: 8px 16px;
+      border-bottom: 1px solid var(--border); background: var(--bg); flex-shrink: 0; flex-wrap: wrap;
     }
     .ptab {
-      padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
-      cursor: pointer; border: 1px solid var(--border); color: var(--muted);
-      transition: all 0.15s;
+      padding: 4px 13px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border); color: var(--muted); transition: all 0.12s; white-space: nowrap;
     }
     .ptab:hover { border-color: var(--blue); color: var(--blue); }
     .ptab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .pbar-info { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
-    .cache-tag { font-size: 10px; background: rgba(240,136,62,0.12); color: var(--orange); padding: 2px 8px; border-radius: 10px; display: none; }
+    .ptab.now { border-color: rgba(63,185,80,0.4); color: var(--green); }
+    .ptab.now.active { background: #1a472a; border-color: var(--green); }
+    .pbar-info { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+    .cached-tag { font-size: 10px; background: rgba(240,136,62,0.12); color: var(--orange); padding: 2px 7px; border-radius: 10px; display: none; }
+    .ts-label { font-size: 10px; color: var(--muted); }
 
-    /* ── Content ── */
-    .content { flex: 1; overflow-y: auto; padding: 18px 20px; }
+    /* ── CONTENT ── */
+    .content { flex: 1; overflow-y: auto; padding: 14px 16px 20px; }
 
-    /* ── Repo grid ── */
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+    /* ── GRID ── */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 10px; }
 
-    /* ── Repo card ── */
+    /* ── REPO CARD ── */
     .card {
       background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
-      padding: 14px; cursor: pointer; transition: all 0.18s; position: relative; overflow: hidden;
+      padding: 12px 14px; cursor: pointer; transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+      position: relative; overflow: hidden; text-decoration: none; display: block; color: inherit;
     }
-    .card::after {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-      background: linear-gradient(90deg, var(--blue), var(--purple));
-      opacity: 0; transition: opacity 0.2s;
-    }
-    .card:hover { border-color: rgba(88,166,255,0.5); transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,0.4); }
-    .card:hover::after { opacity: 1; }
+    .card:hover { border-color: rgba(88,166,255,0.5); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
 
-    .card-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; min-width: 0; }
-    .av { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; }
-    .rname {
+    /* rank accent bar */
+    .card.rank-1 { border-top: 2px solid var(--gold); }
+    .card.rank-2 { border-top: 2px solid var(--silver); }
+    .card.rank-3 { border-top: 2px solid var(--bronze); }
+
+    /* rank badge */
+    .rank-badge {
+      position: absolute; top: 10px; right: 12px;
+      font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px;
+    }
+    .rank-1 .rank-badge { background: rgba(227,179,65,0.15); color: var(--gold); border: 1px solid rgba(227,179,65,0.3); }
+    .rank-2 .rank-badge { background: rgba(139,148,158,0.15); color: var(--silver); border: 1px solid rgba(139,148,158,0.3); }
+    .rank-3 .rank-badge { background: rgba(240,136,62,0.15); color: var(--bronze); border: 1px solid rgba(240,136,62,0.3); }
+    .rank-other .rank-badge { background: var(--bg3); color: var(--muted); border: 1px solid var(--border); }
+
+    .card-hdr { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; padding-right: 36px; min-width: 0; }
+    .av { width: 17px; height: 17px; border-radius: 50%; flex-shrink: 0; }
+
+    .repo-link {
       font-size: 13px; font-weight: 600; color: var(--blue); text-decoration: none;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
     }
-    .rname:hover { text-decoration: underline; }
-    .lang { font-size: 10px; padding: 2px 7px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+    .repo-link:hover { text-decoration: underline; }
+    .repo-link:hover ~ * { pointer-events: none; }
 
-    .desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 9px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 36px; }
+    .plat-badge { font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 4px; flex-shrink: 0; }
+    .plat-github { background: rgba(240,246,252,0.08); color: var(--gh); border: 1px solid rgba(240,246,252,0.15); }
+    .plat-gitlab { background: rgba(252,109,38,0.1); color: var(--gl); border: 1px solid rgba(252,109,38,0.25); }
 
-    .stats { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-    .stars-total { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 3px; }
-    .stars-gained { font-size: 10px; font-weight: 700; color: var(--green); background: rgba(63,185,80,0.1); padding: 2px 7px; border-radius: 10px; }
-    .meta { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+    .lang-tag { font-size: 10px; padding: 2px 7px; border-radius: 10px; flex-shrink: 0; white-space: nowrap; }
 
-    .topics { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
-    .tag { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: rgba(188,140,255,0.07); color: var(--purple); border: 1px solid rgba(188,140,255,0.15); }
+    .desc { font-size: 11px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 33px; }
+
+    .stats { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; flex-wrap: wrap; }
+    .stars { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 3px; }
+    .gained { font-size: 10px; font-weight: 700; color: var(--green); background: rgba(63,185,80,0.1); padding: 2px 7px; border-radius: 10px; }
+    .gained.hot { color: #ff7b72; background: rgba(248,81,73,0.1); }
+    .st-meta { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+
+    .topics { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 7px; }
+    .tag { font-size: 10px; padding: 2px 6px; border-radius: 10px; background: rgba(188,140,255,0.07); color: var(--purple); border: 1px solid rgba(188,140,255,0.15); }
 
     .insight {
-      display: flex; align-items: flex-start; gap: 6px; padding: 7px 9px;
-      background: rgba(31,111,235,0.06); border: 1px solid rgba(31,111,235,0.15);
-      border-radius: 6px; font-size: 11px; color: var(--muted); line-height: 1.45;
+      display: flex; align-items: flex-start; gap: 5px;
+      padding: 6px 9px; background: rgba(31,111,235,0.06); border: 1px solid rgba(31,111,235,0.14);
+      border-radius: 5px; font-size: 11px; color: var(--muted); line-height: 1.4;
     }
-    .insight-ico { flex-shrink: 0; font-size: 12px; margin-top: 1px; }
+    .insight .ico { flex-shrink: 0; }
 
-    /* ── Papers ── */
-    .papers-hdr { font-size: 14px; font-weight: 700; margin: 24px 0 12px; display: flex; align-items: center; gap: 8px; }
-    .paper-card {
+    /* ── PAPERS ── */
+    .papers-hdr { font-size: 13px; font-weight: 700; margin: 20px 0 10px; display: flex; align-items: center; gap: 7px; }
+    .papers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 10px; }
+    .paper {
       background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
-      padding: 13px; cursor: pointer; transition: border-color 0.15s; margin-bottom: 10px;
+      padding: 12px 14px; cursor: pointer; transition: border-color 0.15s; text-decoration: none; display: block; color: inherit;
     }
-    .paper-card:hover { border-color: var(--yellow); }
-    .ptitle { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
-    .pauthors { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
-    .pnote { font-size: 11px; color: var(--yellow); background: rgba(227,179,65,0.07); padding: 6px 9px; border-radius: 5px; line-height: 1.4; margin-bottom: 7px; }
-    .pbadges { display: flex; gap: 6px; flex-wrap: wrap; }
-    .pbadge { font-size: 10px; padding: 2px 8px; border-radius: 4px; }
-    .pbadge-arxiv { background: rgba(227,179,65,0.1); color: var(--yellow); border: 1px solid rgba(227,179,65,0.2); }
+    .paper:hover { border-color: var(--yellow); }
+    .p-title { font-size: 12px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
+    .p-authors { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+    .p-note { font-size: 11px; color: var(--yellow); background: rgba(227,179,65,0.07); padding: 5px 8px; border-radius: 5px; line-height: 1.4; margin-bottom: 6px; }
+    .p-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+    .pbadge { font-size: 10px; padding: 2px 7px; border-radius: 4px; }
+    .pbadge-ax { background: rgba(227,179,65,0.1); color: var(--yellow); border: 1px solid rgba(227,179,65,0.2); }
     .pbadge-src { color: var(--muted); border: 1px solid var(--border); }
 
-    /* ── Skeleton ── */
-    .sk {
-      background: linear-gradient(90deg, var(--bg2) 25%, #1c2128 50%, var(--bg2) 75%);
-      background-size: 200% 100%; animation: shimmer 1.6s infinite; border-radius: 8px; height: 175px;
-    }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    /* ── SKELETON ── */
+    .sk { background: linear-gradient(90deg, var(--bg2) 25%, #1c2128 50%, var(--bg2) 75%); background-size: 200% 100%; animation: shimmer 1.6s infinite; border-radius: 8px; height: 165px; }
+    @keyframes shimmer { 0%{background-position:200% 0}100%{background-position:-200% 0} }
 
-    /* ── Empty ── */
+    /* ── EMPTY ── */
     .empty { grid-column: 1/-1; text-align: center; padding: 60px 20px; color: var(--muted); }
-    .empty-ico { font-size: 44px; margin-bottom: 10px; }
-    .empty h3 { color: var(--text); margin-bottom: 6px; }
+    .empty .ei { font-size: 40px; margin-bottom: 10px; }
+    .empty h3 { color: var(--text); margin-bottom: 6px; font-size: 15px; }
 
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-    /* ── Responsive ── */
-    @media (max-width: 700px) {
-      .sb { display: none; }
-      .grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 680px) { .sb { display: none; } .grid, .papers-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
 
+<!-- ── HEADER ── -->
 <header class="hdr">
-  <div class="logo"><span>★</span> StarPulse</div>
+  <div class="logo"><span class="star">★</span> StarPulse</div>
   <div class="live"><div class="dot"></div>LIVE</div>
-  <div class="search">
-    <input type="text" id="q" placeholder="Filter repos, language, topic…" autocomplete="off">
+
+  <div class="search-wrap">
+    <input type="text" id="q" placeholder="Search repos, language, topic…" autocomplete="off">
   </div>
+
+  <div class="platform-toggle">
+    <div class="ptog gh on" id="togGH" onclick="togglePlatform('github')">GH GitHub</div>
+    <div class="ptog gl on" id="togGL" onclick="togglePlatform('gitlab')">GL GitLab</div>
+  </div>
+
   <div class="hdr-right">
-    <div class="stat-pill" id="statPill"><b>—</b> repos</div>
+    <div class="count-pill" id="countPill"><b>—</b> repos</div>
     <button class="btn" onclick="hardRefresh()">⟳ Refresh</button>
   </div>
 </header>
 
+<!-- ── LAYOUT ── -->
 <div class="layout">
-  <aside class="sb" id="sidebar">
-    <div class="sb-lbl">Category</div>
-    <div class="sb-item active" onclick="setCat('all',this)"><span class="ic">🔥</span>All Trending</div>
-    <div class="sb-item" onclick="setCat('llm',this)"><span class="ic">🤖</span>LLM / AI</div>
-    <div class="sb-item" onclick="setCat('video',this)"><span class="ic">🎬</span>Video AI</div>
-    <div class="sb-item" onclick="setCat('gtm',this)"><span class="ic">📈</span>GTM / Sales</div>
-    <div class="sb-item" onclick="setCat('cyber',this)"><span class="ic">🔐</span>Cybersecurity</div>
-    <div class="sb-item" onclick="setCat('qa',this)"><span class="ic">🧪</span>QA / Testing</div>
-    <div class="sb-item" onclick="setCat('graphics',this)"><span class="ic">🎨</span>Graphics / 3D</div>
-    <div class="sb-item" onclick="setCat('memory',this)"><span class="ic">🧠</span>AI Memory</div>
-    <div class="sb-item" onclick="setCat('softeng',this)"><span class="ic">⚙️</span>Dev Tools</div>
-    <div class="sb-lbl" style="margin-top:6px">Research</div>
-    <div class="sb-item" onclick="setCat('papers',this)"><span class="ic">📄</span>Papers</div>
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sb" id="sb">
+    <div class="sb-lbl">All</div>
+    <div class="sb-item active" data-cat="all" onclick="setCat('all',this)"><span class="ic">🔥</span><span class="label">Trending</span></div>
+
+    <div class="sb-lbl">AI / ML</div>
+    <div class="sb-item" data-cat="llm" onclick="setCat('llm',this)"><span class="ic">🤖</span><span class="label">LLM / AI</span></div>
+    <div class="sb-item" data-cat="agents" onclick="setCat('agents',this)"><span class="ic">🕸️</span><span class="label">AI Agents</span></div>
+    <div class="sb-item" data-cat="image" onclick="setCat('image',this)"><span class="ic">🖼️</span><span class="label">Image / Diffusion</span></div>
+    <div class="sb-item" data-cat="video" onclick="setCat('video',this)"><span class="ic">🎬</span><span class="label">Video AI</span></div>
+    <div class="sb-item" data-cat="audio" onclick="setCat('audio',this)"><span class="ic">🔊</span><span class="label">Audio / TTS</span></div>
+    <div class="sb-item" data-cat="memory" onclick="setCat('memory',this)"><span class="ic">🧠</span><span class="label">Memory / RAG</span></div>
+    <div class="sb-item" data-cat="robotics" onclick="setCat('robotics',this)"><span class="ic">🤖</span><span class="label">Robotics</span></div>
+
+    <div class="sb-lbl">Engineering</div>
+    <div class="sb-item" data-cat="softeng" onclick="setCat('softeng',this)"><span class="ic">⚙️</span><span class="label">Dev Tools</span></div>
+    <div class="sb-item" data-cat="qa" onclick="setCat('qa',this)"><span class="ic">🧪</span><span class="label">QA / Testing</span></div>
+    <div class="sb-item" data-cat="data" onclick="setCat('data',this)"><span class="ic">📊</span><span class="label">Data / Analytics</span></div>
+    <div class="sb-item" data-cat="graphics" onclick="setCat('graphics',this)"><span class="ic">🎨</span><span class="label">Graphics / 3D</span></div>
+    <div class="sb-item" data-cat="cyber" onclick="setCat('cyber',this)"><span class="ic">🔐</span><span class="label">Cybersecurity</span></div>
+    <div class="sb-item" data-cat="web3" onclick="setCat('web3',this)"><span class="ic">🌐</span><span class="label">Web3</span></div>
+
+    <div class="sb-lbl">Business</div>
+    <div class="sb-item" data-cat="gtm" onclick="setCat('gtm',this)"><span class="ic">📈</span><span class="label">GTM / Sales</span></div>
+
+    <div class="sb-lbl">Research</div>
+    <div class="sb-item" data-cat="papers" onclick="setCat('papers',this)"><span class="ic">📄</span><span class="label">Papers</span></div>
   </aside>
 
+  <!-- ── MAIN ── -->
   <main class="main">
+    <!-- Period tabs -->
     <div class="pbar">
-      <button class="ptab" onclick="setPeriod('yesterday',this)">Yesterday</button>
-      <button class="ptab active" onclick="setPeriod('week',this)">This Week</button>
-      <button class="ptab" onclick="setPeriod('month',this)">This Month</button>
-      <button class="ptab" onclick="setPeriod('year',this)">This Year</button>
+      <button class="ptab now" data-p="now" onclick="setPeriod('now',this)">🔴 Trending Now</button>
+      <button class="ptab" data-p="today" onclick="setPeriod('today',this)">Today</button>
+      <button class="ptab" data-p="yesterday" onclick="setPeriod('yesterday',this)">Yesterday</button>
+      <button class="ptab active" data-p="week" onclick="setPeriod('week',this)">This Week</button>
+      <button class="ptab" data-p="month" onclick="setPeriod('month',this)">This Month</button>
+      <button class="ptab" data-p="year" onclick="setPeriod('year',this)">This Year</button>
       <div class="pbar-info">
-        <span id="cacheTag" class="cache-tag">CACHED</span>
-        <span id="tsLabel"></span>
+        <span id="cacheTag" class="cached-tag">CACHED</span>
+        <span id="tsLabel" class="ts-label"></span>
       </div>
     </div>
 
+    <!-- Content -->
     <div class="content" id="content">
       <div class="grid" id="grid"></div>
-      <div id="papersSection" style="display:none">
+      <div id="papersSec" style="display:none">
         <div class="papers-hdr">📄 Trending Research Papers</div>
-        <div id="papersGrid"></div>
+        <div class="papers-grid" id="pgrid"></div>
       </div>
     </div>
   </main>
 </div>
 
 <script>
-  let cat = 'all', period = 'week', allRepos = [], loading = false;
+  // ── State ─────────────────────────────────────────────────
+  let cat = 'all', period = 'week', allRepos = [];
+  let ghOn = true, glOn = true;
+  let loading = false;
 
-  const LANG_COLOR = {
+  const LANG_CLR = {
     Python:'#3572A5',JavaScript:'#f1e05a',TypeScript:'#3178c6',Go:'#00ADD8',
     Rust:'#dea584',Java:'#b07219','C++':'#f34b7d',C:'#555555',Ruby:'#701516',
     Swift:'#F05138',Kotlin:'#A97BFF',Dart:'#00B4AB',PHP:'#4F5D95',Shell:'#89e051',
     HTML:'#e34c26',CSS:'#563d7c',Vue:'#4FC08D',Lua:'#000080',R:'#198CE7',
-    'Jupyter Notebook':'#DA5B0B',Scala:'#c22d40',Elixir:'#6e4a7e',
+    'Jupyter Notebook':'#DA5B0B',Scala:'#c22d40','C#':'#178600',Elixir:'#6e4a7e',
   };
 
   function fmt(n) {
     if (!n) return '0';
-    return n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n);
+    if (n >= 1000000) return (n/1000000).toFixed(1)+'M';
+    if (n >= 1000) return (n/1000).toFixed(1)+'k';
+    return String(n);
   }
 
   function relTime(iso) {
     if (!iso) return '';
-    const d = new Date(iso), now = new Date();
-    const diff = (now - d) / 86400000;
+    const d = new Date(iso), now = new Date(), diff = (now - d) / 86400000;
     if (diff < 1) return 'today';
     if (diff < 2) return 'yesterday';
     if (diff < 30) return Math.floor(diff)+'d ago';
@@ -253,127 +295,169 @@
     return Math.floor(diff/365)+'y ago';
   }
 
-  function repoCard(r) {
-    const lc = LANG_COLOR[r.language] || '#8b949e';
-    const langHtml = r.language
-      ? `<span class="lang" style="color:${lc};background:${lc}14;border:1px solid ${lc}30">● ${r.language}</span>` : '';
-    const gainHtml = r.stars_gained > 0
-      ? `<span class="stars-gained">▲ ${fmt(r.stars_gained)} ${period === 'today' ? 'today' : period === 'yesterday' ? 'yest.' : period === 'week' ? 'wk' : period === 'month' ? 'mo' : 'yr'}</span>` : '';
-    const topicsHtml = (r.topics||[]).slice(0,4).map(t=>`<span class="tag">${t}</span>`).join('');
-    const insightHtml = r.insight
-      ? `<div class="insight"><span class="insight-ico">🔮</span><span>${r.insight}</span></div>` : '';
-    const created = r.created_at ? `<span class="meta" title="Created ${r.created_at}">🕒 ${relTime(r.created_at)}</span>` : '';
-    const forks = r.forks ? `<span class="meta">🍴 ${fmt(r.forks)}</span>` : '';
+  function gainLabel() {
+    return { now:'today', today:'today', yesterday:'yest', week:'wk', month:'mo', year:'yr' }[period] || '';
+  }
 
-    return `<div class="card" onclick="open('${r.url}','_blank')">
+  // ── RANK CSS CLASS ─────────────────────────────────────────
+  function rankClass(rank) {
+    if (rank === 1) return 'rank-1';
+    if (rank === 2) return 'rank-2';
+    if (rank === 3) return 'rank-3';
+    return 'rank-other';
+  }
+
+  // ── REPO CARD ─────────────────────────────────────────────
+  function repoCard(r, idx) {
+    const rank = r.rank || (idx + 1);
+    const lc = LANG_CLR[r.language] || '#8b949e';
+    const langHtml = r.language
+      ? `<span class="lang-tag" style="color:${lc};background:${lc}12;border:1px solid ${lc}28">● ${r.language}</span>` : '';
+
+    const platClass = r.platform === 'gitlab' ? 'plat-gitlab' : 'plat-github';
+    const platLabel = r.platform === 'gitlab' ? 'GL' : 'GH';
+    const platHtml = `<span class="plat-badge ${platClass}">${platLabel}</span>`;
+
+    const gainedHtml = r.stars_gained > 0
+      ? `<span class="gained ${r.stars_gained > 1000 ? 'hot' : ''}">▲ ${fmt(r.stars_gained)} ${gainLabel()}</span>` : '';
+
+    const topicsHtml = (r.topics || []).slice(0, 4).map(t => `<span class="tag">${t}</span>`).join('');
+    const insightHtml = r.insight
+      ? `<div class="insight"><span class="ico">🔮</span><span>${r.insight}</span></div>` : '';
+    const createdHtml = r.created_at ? `<span class="st-meta">🕒 ${relTime(r.created_at)}</span>` : '';
+    const forksHtml = r.forks ? `<span class="st-meta">🍴 ${fmt(r.forks)}</span>` : '';
+
+    // Rank badge label
+    const rankLabel = rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : `#${rank}`;
+
+    return `
+    <a class="card ${rankClass(rank)}" href="${r.url}" target="_blank" rel="noopener noreferrer">
+      <span class="rank-badge">${rankLabel}</span>
       <div class="card-hdr">
         <img class="av" src="${r.owner_avatar}" loading="lazy" onerror="this.remove()">
-        <a class="rname" href="${r.url}" target="_blank" onclick="event.stopPropagation()">${r.full_name}</a>
+        <span class="repo-link">${r.full_name}</span>
+        ${platHtml}
         ${langHtml}
       </div>
-      <div class="desc">${r.description || '<em style="opacity:.5">No description</em>'}</div>
+      <div class="desc">${r.description || '<em style="opacity:.4">No description</em>'}</div>
       <div class="stats">
-        <span class="stars-total">⭐ ${fmt(r.stars)}</span>
-        ${gainHtml}${forks}${created}
+        <span class="stars">⭐ ${fmt(r.stars)}</span>
+        ${gainedHtml}${forksHtml}${createdHtml}
       </div>
       ${topicsHtml ? `<div class="topics">${topicsHtml}</div>` : ''}
       ${insightHtml}
-    </div>`;
+    </a>`;
   }
 
+  // ── PAPER CARD ────────────────────────────────────────────
   function paperCard(p) {
-    const notable = p.why_notable || (p.summary ? p.summary.slice(0,200)+'…' : '');
-    return `<div class="paper-card" onclick="open('${p.url}','_blank')">
-      <div class="ptitle">${p.title}</div>
-      <div class="pauthors">${p.authors||''}</div>
-      ${notable ? `<div class="pnote">${notable}</div>` : ''}
-      <div class="pbadges">
-        ${p.arxiv_id ? `<span class="pbadge pbadge-arxiv">arXiv:${p.arxiv_id}</span>` : ''}
+    const note = p.why_notable || (p.summary ? p.summary.slice(0, 200) + '…' : '');
+    return `
+    <a class="paper" href="${p.url}" target="_blank" rel="noopener noreferrer">
+      <div class="p-title">${p.title}</div>
+      <div class="p-authors">${p.authors || ''}</div>
+      ${note ? `<div class="p-note">${note}</div>` : ''}
+      <div class="p-badges">
+        ${p.arxiv_id ? `<span class="pbadge pbadge-ax">arXiv:${p.arxiv_id}</span>` : ''}
         <span class="pbadge pbadge-src">${p.source === 'arxiv' ? 'arXiv' : 'Perplexity'}</span>
       </div>
-    </div>`;
+    </a>`;
   }
 
-  function showSkeleton(n=8) {
+  // ── RENDER ────────────────────────────────────────────────
+  function showSkeletons(n=8) {
     document.getElementById('grid').innerHTML = Array(n).fill('<div class="sk"></div>').join('');
-    document.getElementById('papersSection').style.display = 'none';
+    document.getElementById('papersSec').style.display = 'none';
   }
 
   function render(repos) {
     const q = document.getElementById('q').value.trim().toLowerCase();
-    const filtered = q
+    const list = q
       ? repos.filter(r =>
           (r.full_name||'').toLowerCase().includes(q) ||
           (r.description||'').toLowerCase().includes(q) ||
           (r.language||'').toLowerCase().includes(q) ||
-          (r.topics||[]).some(t=>t.toLowerCase().includes(q))
+          (r.topics||[]).some(t => t.toLowerCase().includes(q))
         )
       : repos;
 
     const grid = document.getElementById('grid');
-    if (!filtered.length) {
-      grid.innerHTML = `<div class="empty"><div class="empty-ico">🔭</div><h3>No repos found</h3><p>Try a broader filter or different category.</p></div>`;
+    if (!list.length) {
+      grid.innerHTML = `<div class="empty"><div class="ei">🔭</div><h3>No repos found</h3><p>Try a different category or period.</p></div>`;
+      document.getElementById('countPill').innerHTML = '<b>0</b> repos';
       return;
     }
-    grid.innerHTML = filtered.map(repoCard).join('');
-    document.getElementById('statPill').innerHTML = `<b>${filtered.length}</b> repos`;
+    grid.innerHTML = list.map((r, i) => repoCard(r, i)).join('');
+    document.getElementById('countPill').innerHTML = `<b>${list.length}</b> repos`;
   }
 
-  async function load(forceRefresh=false) {
-    if (loading) return;
+  function renderPapers(papers) {
+    const sec = document.getElementById('papersSec');
+    if (!papers?.length) { sec.style.display = 'none'; return; }
+    sec.style.display = 'block';
+    document.getElementById('pgrid').innerHTML = papers.map(paperCard).join('');
+  }
+
+  // ── FETCH ─────────────────────────────────────────────────
+  async function load(force=false) {
+    if (loading && !force) return;
     loading = true;
-    showSkeleton();
+    showSkeletons();
     document.getElementById('cacheTag').style.display = 'none';
 
-    if (forceRefresh) await fetch('/api/cache/clear').catch(()=>{});
+    if (force) { try { await fetch('/api/cache/clear'); } catch(e){} }
 
-    // Handle papers-only tab
+    // Papers-only tab
     if (cat === 'papers') {
-      const resp = await fetch(`/api/papers?category=all&period=${period}`).catch(()=>null);
       loading = false;
-      if (!resp?.ok) { document.getElementById('grid').innerHTML = '<div class="empty"><div class="empty-ico">⚠️</div><h3>Failed to load papers</h3></div>'; return; }
-      const json = await resp.json();
+      const resp = await fetch(`/api/papers?category=all&period=${period}`).catch(() => null);
+      if (!resp?.ok) {
+        document.getElementById('grid').innerHTML = '<div class="empty"><div class="ei">⚠️</div><h3>Failed</h3></div>';
+        return;
+      }
+      const j = await resp.json();
       document.getElementById('grid').innerHTML = '';
-      const sec = document.getElementById('papersSection');
-      sec.style.display = 'block';
-      document.getElementById('papersGrid').innerHTML = (json.data||[]).map(paperCard).join('');
-      document.getElementById('statPill').innerHTML = `<b>${json.count||0}</b> papers`;
+      renderPapers(j.data || []);
+      document.getElementById('countPill').innerHTML = `<b>${j.count||0}</b> papers`;
       document.getElementById('tsLabel').textContent = new Date().toLocaleTimeString();
       return;
     }
 
+    // Build platform param
+    const plats = [ghOn && 'github', glOn && 'gitlab'].filter(Boolean).join(',') || 'github';
+
     try {
-      const resp = await fetch(`/api/trending?period=${period}&category=${cat}&limit=30`);
+      const resp = await fetch(`/api/trending?period=${period}&category=${cat}&limit=25&platforms=${plats}`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const json = await resp.json();
-      allRepos = json.data || [];
+      const j = await resp.json();
+      allRepos = j.data || [];
       loading = false;
 
       render(allRepos);
 
-      if (json.cached) document.getElementById('cacheTag').style.display = 'inline';
+      if (j.cached) { const ct = document.getElementById('cacheTag'); ct.style.display='inline'; }
       document.getElementById('tsLabel').textContent = new Date().toLocaleTimeString();
 
-      // Always show papers panel below repos (except papers tab)
+      // Fetch papers in background and show at bottom
       fetchPapers();
     } catch(err) {
       loading = false;
-      document.getElementById('grid').innerHTML = `<div class="empty"><div class="empty-ico">⚠️</div><h3>Error: ${err.message}</h3><p>Check that the server is running.</p></div>`;
+      document.getElementById('grid').innerHTML =
+        `<div class="empty"><div class="ei">⚠️</div><h3>Error: ${err.message}</h3><p>Make sure the server is running on :8080.</p></div>`;
     }
   }
 
   async function fetchPapers() {
     try {
-      const resp = await fetch(`/api/papers?category=${cat === 'all' ? 'llm' : cat}&period=${period}`);
+      const paperCat = (cat === 'all') ? 'llm' : cat;
+      const resp = await fetch(`/api/papers?category=${paperCat}&period=${period}`);
       if (!resp.ok) return;
-      const json = await resp.json();
-      if (!json.data?.length) return;
-      const sec = document.getElementById('papersSection');
-      sec.style.display = 'block';
-      document.getElementById('papersGrid').innerHTML = (json.data||[]).map(paperCard).join('');
-    } catch(e) { /* silent */ }
+      const j = await resp.json();
+      renderPapers(j.data || []);
+    } catch(e) {}
   }
 
+  // ── CONTROLS ──────────────────────────────────────────────
   function setCat(c, el) {
     cat = c;
     document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
@@ -385,6 +469,17 @@
     period = p;
     document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
+    load();
+  }
+
+  function togglePlatform(p) {
+    if (p === 'github') {
+      ghOn = !ghOn;
+      document.getElementById('togGH').classList.toggle('on', ghOn);
+    } else {
+      glOn = !glOn;
+      document.getElementById('togGL').classList.toggle('on', glOn);
+    }
     load();
   }
 

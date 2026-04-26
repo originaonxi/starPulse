@@ -7,20 +7,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from github_client import search_repos, scrape_trending
+from gitlab_client import search_gitlab_repos
 from perplexity_client import enrich_repos, trending_papers as pplx_papers
 from arxiv_client import search_papers
 
 app = FastAPI(title="StarPulse")
 
 _cache: dict = {}
-CACHE_TTL = int(os.getenv("CACHE_TTL", 600))        # 10 min — GitHub data
-PPLX_TTL = int(os.getenv("PPLX_CACHE_TTL", 3600))  # 1 hr  — Perplexity (cost control)
+CACHE_TTL = int(os.getenv("CACHE_TTL", 600))
+PPLX_TTL = int(os.getenv("PPLX_CACHE_TTL", 3600))
 
-TRENDING_PERIOD_MAP = {
-    "today": "daily",
-    "week": "weekly",
-    "month": "monthly",
-}
+TRENDING_PERIOD_MAP = {"now": "daily", "today": "daily", "week": "weekly", "month": "monthly"}
 
 
 def _get(key: str, ttl: int):
@@ -45,31 +42,47 @@ def index():
 def trending(
     period: str = Query("week"),
     category: str = Query("all"),
-    limit: int = Query(30, le=50),
+    limit: int = Query(25, le=50),
+    platforms: str = Query("github,gitlab"),
 ):
-    key = f"trending:{period}:{category}"
+    key = f"trending:{period}:{category}:{platforms}"
     cached = _get(key, CACHE_TTL)
     if cached:
         return {"data": cached, "cached": True, "count": len(cached)}
 
-    # 1. GitHub Search API — new repos gaining stars fast
-    repos = search_repos(period, category, per_page=min(limit, 25))
+    use_github = "github" in platforms
+    use_gitlab = "gitlab" in platforms
 
-    # 2. GitHub trending scrape — velocity for all-category daily/weekly/monthly
-    if category == "all" and period in TRENDING_PERIOD_MAP:
-        since = TRENDING_PERIOD_MAP[period]
-        scraped = scrape_trending(since=since)
+    repos = []
+
+    # ── GitHub ──────────────────────────────────────────────
+    if use_github:
+        gh_repos = search_repos(period, category, per_page=min(limit, 25))
+        repos.extend(gh_repos)
+
+        # Add velocity-based trending for broad categories
+        if category in ("all",) and period in TRENDING_PERIOD_MAP:
+            scraped = scrape_trending(since=TRENDING_PERIOD_MAP[period])
+            existing = {r.full_name for r in repos}
+            for r in scraped:
+                if r.full_name not in existing:
+                    repos.append(r)
+
+    # ── GitLab ──────────────────────────────────────────────
+    if use_gitlab:
+        gl_repos = search_gitlab_repos(period, category, per_page=10)
         existing = {r.full_name for r in repos}
-        for r in scraped:
+        for r in gl_repos:
             if r.full_name not in existing:
                 repos.append(r)
-                existing.add(r.full_name)
 
-    # Sort by stars descending
+    # Sort by stars, assign rank
     repos.sort(key=lambda r: r.stars, reverse=True)
     repos = repos[:limit]
+    for i, r in enumerate(repos):
+        r.rank = i + 1
 
-    # 3. Perplexity "why trending" — batch enrich top 10, cached separately
+    # ── Perplexity enrichment (top 10, cached 1h) ───────────
     pplx_key = f"pplx:{period}:{category}"
     insight_map: dict = _get(pplx_key, PPLX_TTL) or {}
 

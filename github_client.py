@@ -15,29 +15,37 @@ HEADERS = {
 }
 
 PERIOD_DAYS = {
-    "yesterday": 1,
+    "now": 1,
     "today": 0,
+    "yesterday": 1,
     "week": 7,
     "month": 30,
     "year": 365,
 }
 
-# Keyword terms searched in repo name + description (much wider coverage than topic tags)
+# Keyword search in name+description — far wider coverage than sparse topic tags
 CATEGORY_KEYWORDS = {
     "all": [],
     "llm": ["llm", "langchain", "ollama", "openai", "claude", "gemini", "mistral", "vllm"],
-    "video": ["video-generation", "text-to-video", "video-ai", "sora", "video diffusion"],
-    "gtm": ["sales automation", "outreach", "lead generation", "marketing automation", "crm"],
-    "cyber": ["cybersecurity", "pentest", "ctf", "vulnerability", "exploit", "malware"],
-    "qa": ["playwright", "selenium", "pytest", "cypress", "test automation", "e2e testing"],
-    "graphics": ["3d rendering", "webgl", "vulkan", "shader", "blender", "opengl", "threejs"],
+    "agents": ["ai agent", "autogpt", "autonomous agent", "multi-agent", "agentic"],
+    "video": ["video generation", "text-to-video", "video diffusion", "sora", "video ai"],
+    "image": ["stable-diffusion", "diffusion model", "comfyui", "image generation", "flux"],
+    "audio": ["text-to-speech", "voice clone", "whisper", "music generation", "tts"],
     "memory": ["rag", "vector database", "knowledge graph", "memory agent", "embeddings"],
+    "cyber": ["cybersecurity", "pentest", "ctf", "vulnerability", "exploit", "malware"],
+    "qa": ["playwright", "selenium", "pytest", "cypress", "test automation", "e2e"],
+    "graphics": ["3d rendering", "webgl", "vulkan", "shader", "blender", "opengl", "threejs"],
+    "gtm": ["sales automation", "outreach", "lead generation", "marketing automation", "crm"],
     "softeng": ["developer tools", "code editor", "lsp", "devtools", "cli tool"],
+    "data": ["data pipeline", "analytics", "etl", "data warehouse", "dbt", "airflow"],
+    "web3": ["blockchain", "defi", "smart contract", "nft", "solidity", "web3"],
+    "robotics": ["robotics", "ros", "robot arm", "autonomous vehicle", "drone"],
 }
 
 MIN_STARS = {
-    "yesterday": 5,
+    "now": 5,
     "today": 5,
+    "yesterday": 5,
     "week": 10,
     "month": 50,
     "year": 200,
@@ -59,6 +67,8 @@ class Repo:
     category: str = "all"
     insight: str = ""
     stars_gained: int = 0
+    platform: str = "github"
+    rank: int = 0
 
     def to_dict(self):
         return asdict(self)
@@ -68,7 +78,7 @@ def _period_filter(period: str) -> str:
     if period == "today":
         today = datetime.utcnow().strftime("%Y-%m-%d")
         return f"created:{today}"
-    if period == "yesterday":
+    if period in ("now", "yesterday"):
         yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
         today = datetime.utcnow().strftime("%Y-%m-%d")
         return f"created:{yesterday}..{today}"
@@ -83,7 +93,6 @@ def search_repos(period: str = "week", category: str = "all", per_page: int = 25
     min_stars = MIN_STARS.get(period, 10)
 
     if keywords:
-        # Keyword search in name+description — much broader coverage than topic tags
         kw_q = " OR ".join(f'"{k}"' if " " in k else k for k in keywords[:4])
         q = f"({kw_q}) in:name,description {date_q} stars:>{min_stars}"
     else:
@@ -114,13 +123,14 @@ def search_repos(period: str = "week", category: str = "all", per_page: int = 25
             created_at=i["created_at"],
             owner_avatar=i["owner"]["avatar_url"],
             category=category,
+            platform="github",
         )
         for i in resp.json().get("items", [])
     ]
 
 
 def scrape_trending(since: str = "daily") -> List[Repo]:
-    """Scrape github.com/trending for velocity-based trending (star velocity, not just new repos)."""
+    """Scrape github.com/trending — velocity-based (star gains), all ages of repos."""
     try:
         resp = requests.get(
             "https://github.com/trending",
@@ -179,6 +189,7 @@ def scrape_trending(since: str = "daily") -> List[Repo]:
                 owner_avatar=(avatar_el.get("src", "") if avatar_el else ""),
                 category="trending",
                 stars_gained=stars_gained,
+                platform="github",
             ))
 
         return repos
