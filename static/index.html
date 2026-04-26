@@ -3,686 +3,513 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StarPulse — GitHub & GitLab Trending Intelligence</title>
+  <title>StarPulse — Top 100 GitHub Repos</title>
   <style>
     :root {
-      --bg: #0d1117; --bg2: #161b22; --bg3: #010409;
+      --bg:     #0d1117; --bg2: #161b22; --bg3: #010409;
       --border: #30363d; --text: #e6edf3; --muted: #8b949e;
-      --green: #3fb950; --red: #f85149; --blue: #58a6ff;
-      --orange: #f0883e; --purple: #bc8cff; --yellow: #e3b341;
-      --accent: #1f6feb; --gh: #f0f6fc; --gl: #fc6d26;
-      --gold: #e3b341; --silver: #8b949e; --bronze: #f0883e;
-      --breakout: #ff7b72;
+      --green:  #3fb950; --blue: #58a6ff; --orange: #f0883e;
+      --purple: #bc8cff; --yellow: #e3b341; --red: #ff7b72;
+      --accent: #1f6feb; --gold: #e3b341; --silver: #8b949e; --bronze: #f0883e;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; overflow: hidden; }
-    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:var(--bg);color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px}
 
     /* ── HEADER ── */
-    .hdr {
-      height: 46px; display: flex; align-items: center; gap: 14px;
-      padding: 0 18px; background: var(--bg3); border-bottom: 1px solid var(--border);
-      position: fixed; top: 0; left: 0; right: 0; z-index: 300;
+    .hdr{
+      height:50px;display:flex;align-items:center;gap:14px;padding:0 20px;
+      background:var(--bg3);border-bottom:1px solid var(--border);
+      position:fixed;top:0;left:0;right:0;z-index:300;
     }
-    .logo { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-    .logo .star { color: var(--gold); }
-    .live { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: var(--green); letter-spacing: 0.8px; }
-    .dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
-    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.25} }
+    .logo{font-size:17px;font-weight:900;display:flex;align-items:center;gap:7px}
+    .logo .star{color:var(--gold)}
+    .tagline{font-size:11px;color:var(--muted);white-space:nowrap}
+    .live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
 
-    .search-wrap { flex: 1; max-width: 260px; position: relative; }
-    .search-wrap input {
-      width: 100%; background: var(--bg2); border: 1px solid var(--border); color: var(--text);
-      padding: 5px 10px 5px 28px; border-radius: 6px; font-size: 12px; outline: none;
+    .hdr-search{flex:1;max-width:280px;position:relative}
+    .hdr-search input{
+      width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);
+      padding:6px 10px 6px 30px;border-radius:6px;font-size:12px;outline:none;
     }
-    .search-wrap input:focus { border-color: var(--blue); }
-    .search-wrap::before { content:'⌕'; position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; font-size:13px; }
+    .hdr-search input:focus{border-color:var(--blue)}
+    .hdr-search::before{content:'⌕';position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
 
-    .platform-toggle { display: flex; gap: 4px; margin-left: 4px; }
-    .ptog {
-      display: flex; align-items: center; gap: 5px; padding: 4px 10px;
-      border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
-      border: 1px solid var(--border); color: var(--muted); transition: all 0.15s;
+    .hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+    .stat-chip{font-size:11px;color:var(--muted);background:var(--bg2);
+      border:1px solid var(--border);padding:4px 10px;border-radius:12px;white-space:nowrap}
+    .stat-chip b{color:var(--text)}
+    .btn{background:var(--bg2);border:1px solid var(--border);color:var(--muted);
+      padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer;transition:all .15s}
+    .btn:hover{border-color:var(--blue);color:var(--blue)}
+    .btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+    /* ── NAV TABS ── */
+    .nav{
+      height:38px;display:flex;align-items:center;gap:4px;padding:0 20px;
+      background:var(--bg3);border-bottom:1px solid var(--border);
+      position:fixed;top:50px;left:0;right:0;z-index:299;overflow-x:auto;
     }
-    .ptog.on.gh { border-color: var(--gh); color: var(--gh); background: rgba(240,246,252,0.07); }
-    .ptog.on.gl { border-color: var(--gl); color: var(--gl); background: rgba(252,109,38,0.08); }
-
-    .hdr-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-    .count-pill { font-size: 11px; color: var(--muted); background: var(--bg2); border: 1px solid var(--border); padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
-    .count-pill b { color: var(--text); }
-    .btn { background: var(--bg2); border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.15s; }
-    .btn:hover { border-color: var(--blue); color: var(--blue); }
-
-    /* ── STATS BAR ── */
-    .statsbar {
-      height: 28px; display: flex; align-items: center; gap: 16px; padding: 0 18px;
-      background: var(--bg3); border-bottom: 1px solid var(--border);
-      position: fixed; top: 46px; left: 0; right: 0; z-index: 299;
-      font-size: 11px; color: var(--muted);
+    .nav::-webkit-scrollbar{height:3px}
+    .nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+    .ntab{
+      padding:5px 13px;border-radius:5px;font-size:11px;font-weight:600;
+      cursor:pointer;border:1px solid transparent;color:var(--muted);
+      white-space:nowrap;transition:all .12s;flex-shrink:0;
     }
-    .statsbar .sb-stat { display: flex; align-items: center; gap: 4px; }
-    .statsbar .sb-stat b { color: var(--text); }
-    .statsbar .src-badge {
-      margin-left: auto; font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    .ntab:hover{background:var(--bg2);color:var(--text)}
+    .ntab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+    .ntab.breakout-tab{color:var(--red)}
+    .ntab.breakout-tab.active{background:#3d1515;border-color:var(--red);color:var(--red)}
+    .nav-sep{width:1px;height:18px;background:var(--border);margin:0 4px;flex-shrink:0}
+
+    /* ── PAGE ── */
+    .page{position:fixed;top:88px;bottom:0;left:0;right:0;overflow-y:auto;padding:18px 20px 30px}
+
+    /* ── TOP10 VIEW ── */
+    .cat-block{margin-bottom:36px}
+    .cat-hdr{
+      display:flex;align-items:center;gap:10px;margin-bottom:12px;
+      padding-bottom:9px;border-bottom:1px solid var(--border);
     }
-    .src-db  { background: rgba(63,185,80,0.12); color: var(--green); border: 1px solid rgba(63,185,80,0.25); }
-    .src-live { background: rgba(88,166,255,0.1); color: var(--blue); border: 1px solid rgba(88,166,255,0.2); }
-
-    /* ── LAYOUT ── */
-    .layout { display: flex; position: fixed; top: 74px; bottom: 0; left: 0; right: 0; }
-
-    /* ── SIDEBAR ── */
-    .sb { width: 186px; min-width: 186px; background: var(--bg3); border-right: 1px solid var(--border); overflow-y: auto; padding: 8px 0; }
-    .sb-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: var(--muted); padding: 9px 14px 3px; }
-    .sb-item {
-      display: flex; align-items: center; gap: 8px; padding: 7px 14px;
-      cursor: pointer; color: var(--muted); transition: all 0.12s;
-      border-left: 2px solid transparent; user-select: none;
+    .cat-icon{font-size:18px;line-height:1}
+    .cat-title{font-size:15px;font-weight:800}
+    .cat-meta{margin-left:auto;display:flex;align-items:center;gap:8px}
+    .cat-pill{
+      font-size:10px;padding:2px 8px;border-radius:10px;white-space:nowrap;
+      background:var(--bg2);border:1px solid var(--border);color:var(--muted);
     }
-    .sb-item:hover { background: var(--bg2); color: var(--text); }
-    .sb-item.active { color: var(--blue); background: rgba(88,166,255,0.07); border-left-color: var(--blue); font-weight: 600; }
-    .sb-item .ic { font-size: 13px; line-height: 1; flex-shrink: 0; }
-    .sb-item .label { flex: 1; }
-
-    /* ── MAIN ── */
-    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-    /* ── PERIOD + SORT BAR ── */
-    .pbar {
-      display: flex; align-items: center; gap: 5px; padding: 8px 16px;
-      border-bottom: 1px solid var(--border); background: var(--bg); flex-shrink: 0; flex-wrap: wrap;
+    .cat-pill.stars{color:var(--yellow);border-color:rgba(227,179,65,.25);background:rgba(227,179,65,.05)}
+    .cat-pill.vel{color:var(--green);border-color:rgba(63,185,80,.25);background:rgba(63,185,80,.05)}
+    .cat-see-more{
+      font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;cursor:pointer;
+      border:1px solid var(--border);color:var(--blue);background:transparent;
+      transition:all .12s;text-decoration:none;
     }
-    .ptab {
-      padding: 4px 13px; border-radius: 20px; font-size: 11px; font-weight: 600;
-      cursor: pointer; border: 1px solid var(--border); color: var(--muted); transition: all 0.12s; white-space: nowrap;
-    }
-    .ptab:hover { border-color: var(--blue); color: var(--blue); }
-    .ptab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .ptab.now { border-color: rgba(63,185,80,0.4); color: var(--green); }
-    .ptab.now.active { background: #1a472a; border-color: var(--green); }
+    .cat-see-more:hover{background:rgba(88,166,255,.08);border-color:var(--blue)}
 
-    .sort-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
-    .sort-lbl { font-size: 10px; color: var(--muted); white-space: nowrap; }
-    .stab {
-      padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 600;
-      cursor: pointer; border: 1px solid var(--border); color: var(--muted); transition: all 0.12s; white-space: nowrap;
-    }
-    .stab:hover { border-color: var(--purple); color: var(--purple); }
-    .stab.active { background: rgba(188,140,255,0.1); border-color: var(--purple); color: var(--purple); }
-
-    .pbar-info { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-    .cached-tag { font-size: 10px; background: rgba(240,136,62,0.12); color: var(--orange); padding: 2px 7px; border-radius: 10px; display: none; }
-    .ts-label { font-size: 10px; color: var(--muted); }
-
-    /* ── CONTENT ── */
-    .content { flex: 1; overflow-y: auto; padding: 14px 16px 20px; }
-
-    /* ── GRID ── */
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 10px; }
+    /* repo list inside a category */
+    .repo-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:8px}
 
     /* ── REPO CARD ── */
-    .card {
-      background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
-      padding: 12px 14px; cursor: pointer; transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-      position: relative; overflow: hidden; text-decoration: none; display: block; color: inherit;
+    .rcard{
+      background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+      padding:11px 13px 10px;display:flex;flex-direction:column;gap:6px;
+      text-decoration:none;color:inherit;transition:border-color .14s,transform .14s,box-shadow .14s;
+      position:relative;
     }
-    .card:hover { border-color: rgba(88,166,255,0.5); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
-    .card.rank-1 { border-top: 2px solid var(--gold); }
-    .card.rank-2 { border-top: 2px solid var(--silver); }
-    .card.rank-3 { border-top: 2px solid var(--bronze); }
-    .card.breakout-card { border-left: 2px solid var(--breakout); }
+    .rcard:hover{border-color:rgba(88,166,255,.5);transform:translateY(-1px);box-shadow:0 5px 18px rgba(0,0,0,.5)}
+    .rcard.r1{border-top:2px solid var(--gold)}
+    .rcard.r2{border-top:2px solid var(--silver)}
+    .rcard.r3{border-top:2px solid var(--bronze)}
+    .rcard.bo{border-left:2px solid var(--red)}
 
-    .card-badges { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; align-items: center; }
-    .rank-badge { font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; }
-    .rank-1 .rank-badge { background: rgba(227,179,65,0.15); color: var(--gold); border: 1px solid rgba(227,179,65,0.3); }
-    .rank-2 .rank-badge { background: rgba(139,148,158,0.15); color: var(--silver); border: 1px solid rgba(139,148,158,0.3); }
-    .rank-3 .rank-badge { background: rgba(240,136,62,0.15); color: var(--bronze); border: 1px solid rgba(240,136,62,0.3); }
-    .rank-other .rank-badge { background: var(--bg3); color: var(--muted); border: 1px solid var(--border); }
-    .breakout-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: rgba(255,123,114,0.15); color: var(--breakout); border: 1px solid rgba(255,123,114,0.3); }
-
-    .card-hdr { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; padding-right: 68px; min-width: 0; }
-    .av { width: 17px; height: 17px; border-radius: 50%; flex-shrink: 0; }
-
-    .repo-link {
-      font-size: 13px; font-weight: 600; color: var(--blue); text-decoration: none;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+    .rc-top{display:flex;align-items:center;gap:7px;min-width:0}
+    .rc-rank{
+      font-size:13px;font-weight:900;flex-shrink:0;width:26px;text-align:center;
     }
+    .r1 .rc-rank{color:var(--gold)} .r2 .rc-rank{color:var(--silver)} .r3 .rc-rank{color:var(--bronze)}
+    .rc-rank.other{color:var(--muted);font-size:11px}
+    .av{width:17px;height:17px;border-radius:50%;flex-shrink:0}
+    .rc-name{font-size:12px;font-weight:700;color:var(--blue);
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+    .bo-badge{font-size:9px;font-weight:800;padding:2px 5px;border-radius:4px;
+      background:rgba(255,123,114,.12);color:var(--red);border:1px solid rgba(255,123,114,.25);flex-shrink:0}
+    .lang-dot{font-size:10px;padding:2px 7px;border-radius:10px;flex-shrink:0;white-space:nowrap}
 
-    .plat-badge { font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 4px; flex-shrink: 0; }
-    .plat-github { background: rgba(240,246,252,0.08); color: var(--gh); border: 1px solid rgba(240,246,252,0.15); }
-    .plat-gitlab { background: rgba(252,109,38,0.1); color: var(--gl); border: 1px solid rgba(252,109,38,0.25); }
+    .rc-desc{font-size:11px;color:var(--muted);line-height:1.45;
+      display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 
-    .lang-tag { font-size: 10px; padding: 2px 7px; border-radius: 10px; flex-shrink: 0; white-space: nowrap; }
-
-    .desc { font-size: 11px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 33px; }
-
-    .stats { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; flex-wrap: wrap; }
-    .stars { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 3px; }
-    .gained { font-size: 10px; font-weight: 700; color: var(--green); background: rgba(63,185,80,0.1); padding: 2px 7px; border-radius: 10px; }
-    .gained.hot { color: #ff7b72; background: rgba(248,81,73,0.1); }
-    .vel-pill { font-size: 10px; color: var(--blue); background: rgba(88,166,255,0.08); padding: 2px 6px; border-radius: 10px; border: 1px solid rgba(88,166,255,0.15); }
-    .st-meta { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 3px; }
-    .score-pill { font-size: 9px; color: var(--muted); background: var(--bg3); padding: 2px 5px; border-radius: 6px; border: 1px solid var(--border); }
-
-    .topics { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 7px; }
-    .tag { font-size: 10px; padding: 2px 6px; border-radius: 10px; background: rgba(188,140,255,0.07); color: var(--purple); border: 1px solid rgba(188,140,255,0.15); }
-
-    .insight {
-      display: flex; align-items: flex-start; gap: 5px;
-      padding: 6px 9px; background: rgba(31,111,235,0.06); border: 1px solid rgba(31,111,235,0.14);
-      border-radius: 5px; font-size: 11px; color: var(--muted); line-height: 1.4;
+    /* signal bar */
+    .rc-sig{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .sig{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--muted)}
+    .sig b{color:var(--text)}
+    .sig.stars b{color:var(--yellow)}
+    .sig.vel b{color:var(--green)}
+    .sig.score b{color:var(--purple)}
+    .sig.forks b{color:var(--blue)}
+    .vel-badge{
+      font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;
+      background:rgba(63,185,80,.1);color:var(--green);border:1px solid rgba(63,185,80,.2)
     }
-    .insight .ico { flex-shrink: 0; }
+    .vel-badge.hot{background:rgba(255,123,114,.1);color:var(--red);border-color:rgba(255,123,114,.2)}
 
-    /* ── CONTRIBUTORS ── */
-    .contrib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
-    .contrib-card {
-      background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
-      padding: 10px 12px; display: flex; align-items: center; gap: 10px;
+    /* why row */
+    .rc-why{
+      font-size:10px;color:var(--muted);background:rgba(31,111,235,.05);
+      border:1px solid rgba(31,111,235,.12);border-radius:4px;
+      padding:4px 8px;line-height:1.4;
     }
-    .contrib-rank { font-size: 12px; font-weight: 800; width: 24px; text-align: right; color: var(--muted); flex-shrink: 0; }
-    .contrib-info { flex: 1; min-width: 0; }
-    .contrib-name { font-size: 12px; font-weight: 600; color: var(--blue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .contrib-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
-    .contrib-stars { font-size: 12px; font-weight: 700; color: var(--yellow); white-space: nowrap; }
-
-    /* ── PAPERS ── */
-    .papers-hdr { font-size: 13px; font-weight: 700; margin: 20px 0 10px; display: flex; align-items: center; gap: 7px; }
-    .papers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 10px; }
-    .paper {
-      background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
-      padding: 12px 14px; cursor: pointer; transition: border-color 0.15s; text-decoration: none; display: block; color: inherit;
-    }
-    .paper:hover { border-color: var(--yellow); }
-    .p-title { font-size: 12px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
-    .p-authors { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
-    .p-note { font-size: 11px; color: var(--yellow); background: rgba(227,179,65,0.07); padding: 5px 8px; border-radius: 5px; line-height: 1.4; margin-bottom: 6px; }
-    .p-badges { display: flex; gap: 5px; flex-wrap: wrap; }
-    .pbadge { font-size: 10px; padding: 2px 7px; border-radius: 4px; }
-    .pbadge-ax { background: rgba(227,179,65,0.1); color: var(--yellow); border: 1px solid rgba(227,179,65,0.2); }
-    .pbadge-src { color: var(--muted); border: 1px solid var(--border); }
 
     /* ── SKELETON ── */
-    .sk { background: linear-gradient(90deg, var(--bg2) 25%, #1c2128 50%, var(--bg2) 75%); background-size: 200% 100%; animation: shimmer 1.6s infinite; border-radius: 8px; height: 165px; }
-    @keyframes shimmer { 0%{background-position:200% 0}100%{background-position:-200% 0} }
+    .sk{background:linear-gradient(90deg,var(--bg2) 25%,#1c2128 50%,var(--bg2) 75%);
+      background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;height:100px}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .sk-cat{height:28px;width:200px;margin-bottom:12px;border-radius:6px}
+
+    /* ── CONTRIBUTORS ── */
+    .contrib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+    .ccard{background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+      padding:10px 13px;display:flex;align-items:center;gap:10px}
+    .crank{font-size:12px;font-weight:800;color:var(--muted);width:28px;text-align:right;flex-shrink:0}
+    .cinfo{flex:1;min-width:0}
+    .cname{font-size:12px;font-weight:700;color:var(--blue);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cmeta{font-size:10px;color:var(--muted);margin-top:2px}
+    .cstars{font-size:12px;font-weight:700;color:var(--yellow);white-space:nowrap}
+
+    /* ── PAPERS ── */
+    .papers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px}
+    .pcard{background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+      padding:12px 14px;text-decoration:none;color:inherit;display:block;transition:border-color .14s}
+    .pcard:hover{border-color:var(--yellow)}
+    .pt{font-size:12px;font-weight:700;line-height:1.4;margin-bottom:4px}
+    .pa{font-size:10px;color:var(--muted);margin-bottom:6px}
+    .pn{font-size:11px;color:var(--yellow);background:rgba(227,179,65,.07);
+      padding:5px 8px;border-radius:4px;line-height:1.4;margin-bottom:6px}
+    .pbadge{font-size:10px;padding:2px 7px;border-radius:4px;border:1px solid var(--border);color:var(--muted)}
+
+    /* ── BREAKOUTS ── */
+    .breakout-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:8px}
 
     /* ── EMPTY ── */
-    .empty { grid-column: 1/-1; text-align: center; padding: 60px 20px; color: var(--muted); }
-    .empty .ei { font-size: 40px; margin-bottom: 10px; }
-    .empty h3 { color: var(--text); margin-bottom: 6px; font-size: 15px; }
+    .empty{text-align:center;padding:60px 20px;color:var(--muted)}
+    .empty .ei{font-size:40px;margin-bottom:10px}
+    .empty h3{color:var(--text);font-size:15px;margin-bottom:6px}
 
-    /* ── SCROLLBAR ── */
-    ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar{width:4px;height:4px}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
-    @media (max-width: 680px) { .sb { display: none; } .grid, .papers-grid, .contrib-grid { grid-template-columns: 1fr; } }
+    @media(max-width:600px){.repo-list,.contrib-grid,.papers-grid,.breakout-grid{grid-template-columns:1fr}
+      .tagline{display:none}}
   </style>
 </head>
 <body>
 
-<!-- ── HEADER ── -->
+<!-- HEADER -->
 <header class="hdr">
   <div class="logo"><span class="star">★</span> StarPulse</div>
-  <div class="live"><div class="dot"></div>LIVE</div>
+  <div class="live-dot"></div>
+  <span class="tagline">Top 100 GitHub repos across the 10 hottest topics</span>
 
-  <div class="search-wrap">
-    <input type="text" id="q" placeholder="Search repos, language, topic…" autocomplete="off">
-  </div>
-
-  <div class="platform-toggle">
-    <div class="ptog gh on" id="togGH" onclick="togglePlatform('github')">GH GitHub</div>
-    <div class="ptog gl on" id="togGL" onclick="togglePlatform('gitlab')">GL GitLab</div>
+  <div class="hdr-search">
+    <input type="text" id="q" placeholder="Search repos…" autocomplete="off">
   </div>
 
   <div class="hdr-right">
-    <div class="count-pill" id="countPill"><b>—</b> repos</div>
+    <div class="stat-chip" id="statChip">Loading…</div>
     <button class="btn" onclick="hardRefresh()">⟳ Refresh</button>
   </div>
 </header>
 
-<!-- ── STATS BAR ── -->
-<div class="statsbar" id="statsbar">
-  <div class="sb-stat">📚 Library: <b id="statTotal">—</b> repos</div>
-  <div class="sb-stat">🚀 Breakouts: <b id="statBreakouts" style="color:var(--breakout)">—</b></div>
-  <div class="sb-stat">📄 Papers: <b id="statPapers">—</b></div>
-  <div class="sb-stat">🕒 Updated: <b id="statUpdated">—</b></div>
-  <span class="src-badge" id="srcBadge" style="display:none"></span>
-</div>
+<!-- NAV -->
+<nav class="nav" id="nav">
+  <button class="ntab active" data-view="top10" onclick="setView('top10',this)">🏆 Top 10 × 10</button>
+  <div class="nav-sep"></div>
+  <button class="ntab breakout-tab" data-view="breakouts" onclick="setView('breakouts',this)">🚀 Breakouts</button>
+  <button class="ntab" data-view="contributors" onclick="setView('contributors',this)">👑 Contributors</button>
+  <button class="ntab" data-view="papers" onclick="setView('papers',this)">📄 Papers</button>
+  <div class="nav-sep"></div>
+  <!-- category quick-jumps populated by JS -->
+  <span id="catTabs"></span>
+</nav>
 
-<!-- ── LAYOUT ── -->
-<div class="layout">
-
-  <!-- ── SIDEBAR ── -->
-  <aside class="sb" id="sb">
-    <div class="sb-lbl">All</div>
-    <div class="sb-item active" data-cat="all"          onclick="setCat('all',this)">         <span class="ic">🔥</span><span class="label">Trending</span></div>
-    <div class="sb-item"       data-cat="breakouts"     onclick="setCat('breakouts',this)">   <span class="ic">🚀</span><span class="label">Breakouts</span></div>
-    <div class="sb-item"       data-cat="contributors"  onclick="setCat('contributors',this)"><span class="ic">👑</span><span class="label">Top Contributors</span></div>
-
-    <div class="sb-lbl">AI / ML</div>
-    <div class="sb-item" data-cat="llm"        onclick="setCat('llm',this)">       <span class="ic">🤖</span><span class="label">LLM / AI</span></div>
-    <div class="sb-item" data-cat="agents"     onclick="setCat('agents',this)">    <span class="ic">🕸️</span><span class="label">AI Agents</span></div>
-    <div class="sb-item" data-cat="image"      onclick="setCat('image',this)">     <span class="ic">🖼️</span><span class="label">Image / Diffusion</span></div>
-    <div class="sb-item" data-cat="video"      onclick="setCat('video',this)">     <span class="ic">🎬</span><span class="label">Video AI</span></div>
-    <div class="sb-item" data-cat="audio"      onclick="setCat('audio',this)">     <span class="ic">🔊</span><span class="label">Audio / TTS</span></div>
-    <div class="sb-item" data-cat="memory"     onclick="setCat('memory',this)">    <span class="ic">🧠</span><span class="label">Memory / RAG</span></div>
-    <div class="sb-item" data-cat="open-models" onclick="setCat('open-models',this)"><span class="ic">🦙</span><span class="label">Open Models</span></div>
-    <div class="sb-item" data-cat="robotics"   onclick="setCat('robotics',this)">  <span class="ic">🦾</span><span class="label">Robotics</span></div>
-
-    <div class="sb-lbl">AI Ecosystems</div>
-    <div class="sb-item" data-cat="claude"  onclick="setCat('claude',this)"> <span class="ic">🟣</span><span class="label">Claude / MCP</span></div>
-    <div class="sb-item" data-cat="mcp"     onclick="setCat('mcp',this)">    <span class="ic">⚡</span><span class="label">MCP Servers</span></div>
-    <div class="sb-item" data-cat="codex"   onclick="setCat('codex',this)">  <span class="ic">🧩</span><span class="label">Codex / Copilot</span></div>
-    <div class="sb-item" data-cat="gemini"  onclick="setCat('gemini',this)"> <span class="ic">💎</span><span class="label">Gemini</span></div>
-
-    <div class="sb-lbl">Engineering</div>
-    <div class="sb-item" data-cat="softeng"  onclick="setCat('softeng',this)"> <span class="ic">⚙️</span><span class="label">Dev Tools</span></div>
-    <div class="sb-item" data-cat="qa"       onclick="setCat('qa',this)">      <span class="ic">🧪</span><span class="label">QA / Testing</span></div>
-    <div class="sb-item" data-cat="data"     onclick="setCat('data',this)">    <span class="ic">📊</span><span class="label">Data / Analytics</span></div>
-    <div class="sb-item" data-cat="graphics" onclick="setCat('graphics',this)"><span class="ic">🎨</span><span class="label">Graphics / 3D</span></div>
-    <div class="sb-item" data-cat="animations" onclick="setCat('animations',this)"><span class="ic">✨</span><span class="label">Animations</span></div>
-    <div class="sb-item" data-cat="cyber"    onclick="setCat('cyber',this)">   <span class="ic">🔐</span><span class="label">Cybersecurity</span></div>
-    <div class="sb-item" data-cat="web3"     onclick="setCat('web3',this)">    <span class="ic">🌐</span><span class="label">Web3 / DeFi</span></div>
-
-    <div class="sb-lbl">Business</div>
-    <div class="sb-item" data-cat="gtm"       onclick="setCat('gtm',this)">      <span class="ic">📈</span><span class="label">GTM / Sales</span></div>
-    <div class="sb-item" data-cat="marketing" onclick="setCat('marketing',this)"><span class="ic">📣</span><span class="label">Marketing</span></div>
-    <div class="sb-item" data-cat="finance"   onclick="setCat('finance',this)">  <span class="ic">💰</span><span class="label">Finance / Trading</span></div>
-
-    <div class="sb-lbl">Research</div>
-    <div class="sb-item" data-cat="research"  onclick="setCat('research',this)"> <span class="ic">🔬</span><span class="label">Research</span></div>
-    <div class="sb-item" data-cat="papers"    onclick="setCat('papers',this)">   <span class="ic">📄</span><span class="label">Papers</span></div>
-  </aside>
-
-  <!-- ── MAIN ── -->
-  <main class="main">
-    <!-- Period + sort tabs -->
-    <div class="pbar">
-      <button class="ptab now" data-p="now"       onclick="setPeriod('now',this)">🔴 Trending Now</button>
-      <button class="ptab"     data-p="today"     onclick="setPeriod('today',this)">Today</button>
-      <button class="ptab"     data-p="yesterday" onclick="setPeriod('yesterday',this)">Yesterday</button>
-      <button class="ptab active" data-p="week"   onclick="setPeriod('week',this)">This Week</button>
-      <button class="ptab"     data-p="month"     onclick="setPeriod('month',this)">This Month</button>
-      <button class="ptab"     data-p="year"      onclick="setPeriod('year',this)">This Year</button>
-
-      <div class="sort-sep"></div>
-      <span class="sort-lbl">Sort:</span>
-      <button class="stab"        data-s="score"   onclick="setSort('score',this)">Score</button>
-      <button class="stab active" data-s="stars"   onclick="setSort('stars',this)">⭐ Stars</button>
-      <button class="stab"        data-s="delta7d"  onclick="setSort('delta7d',this)">▲ 7d</button>
-      <button class="stab"        data-s="delta30d" onclick="setSort('delta30d',this)">▲ 30d</button>
-      <button class="stab"        data-s="forks"    onclick="setSort('forks',this)">🍴 Forks</button>
-
-      <div class="pbar-info">
-        <span id="cacheTag" class="cached-tag">CACHED</span>
-        <span id="tsLabel" class="ts-label"></span>
-      </div>
-    </div>
-
-    <!-- Content -->
-    <div class="content" id="content">
-      <div class="grid" id="grid"></div>
-      <div id="papersSec" style="display:none">
-        <div class="papers-hdr">📄 Trending Research Papers</div>
-        <div class="papers-grid" id="pgrid"></div>
-      </div>
-    </div>
-  </main>
-</div>
+<!-- PAGE -->
+<div class="page" id="page"></div>
 
 <script>
-  // ── State ─────────────────────────────────────────────────────────────────
-  let cat = 'all', period = 'week', sortBy = 'stars', allRepos = [];
-  let ghOn = true, glOn = true;
-  let loading = false;
-  let searchTimer = null;
+const LANG_CLR = {
+  Python:'#3572A5',JavaScript:'#f1e05a',TypeScript:'#3178c6',Go:'#00ADD8',
+  Rust:'#dea584',Java:'#b07219','C++':'#f34b7d',C:'#555555',Ruby:'#701516',
+  Swift:'#F05138',Kotlin:'#A97BFF',Dart:'#00B4AB',PHP:'#4F5D95',Shell:'#89e051',
+  HTML:'#e34c26',CSS:'#563d7c',Vue:'#4FC08D','C#':'#178600',Elixir:'#6e4a7e',
+};
 
-  const LANG_CLR = {
-    Python:'#3572A5',JavaScript:'#f1e05a',TypeScript:'#3178c6',Go:'#00ADD8',
-    Rust:'#dea584',Java:'#b07219','C++':'#f34b7d',C:'#555555',Ruby:'#701516',
-    Swift:'#F05138',Kotlin:'#A97BFF',Dart:'#00B4AB',PHP:'#4F5D95',Shell:'#89e051',
-    HTML:'#e34c26',CSS:'#563d7c',Vue:'#4FC08D',Lua:'#000080',R:'#198CE7',
-    'Jupyter Notebook':'#DA5B0B',Scala:'#c22d40','C#':'#178600',Elixir:'#6e4a7e',
-  };
+let currentView = 'top10';
+let top10Data   = null;   // cached API result
+let searchTimer = null;
 
-  function fmt(n) {
-    if (!n || n == 0) return '0';
-    if (n >= 1000000) return (n/1000000).toFixed(1)+'M';
-    if (n >= 1000) return (n/1000).toFixed(1)+'k';
-    return String(n);
-  }
+function fmt(n) {
+  if (!n) return '0';
+  if (n >= 1000000) return (n/1e6).toFixed(1)+'M';
+  if (n >= 1000)    return (n/1000).toFixed(1)+'k';
+  return String(n);
+}
 
-  function relTime(iso) {
-    if (!iso) return '';
-    const d = new Date(iso), now = new Date(), diff = (now - d) / 86400000;
-    if (isNaN(diff)) return '';
-    if (diff < 1) return 'today';
-    if (diff < 2) return 'yesterday';
-    if (diff < 30) return Math.floor(diff)+'d ago';
-    if (diff < 365) return Math.floor(diff/30)+'mo ago';
-    return Math.floor(diff/365)+'y ago';
-  }
+function rankLabel(r) {
+  return r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : `#${r}`;
+}
+function rankClass(r) {
+  return r === 1 ? 'r1' : r === 2 ? 'r2' : r === 3 ? 'r3' : '';
+}
 
-  function gainLabel() {
-    return { now:'today', today:'today', yesterday:'yest', week:'wk', month:'mo', year:'yr' }[period] || '';
-  }
+// ── REPO CARD (dense, signal-rich) ──────────────────────────────────────────
+function repoCard(r) {
+  const lc  = LANG_CLR[r.language] || '#8b949e';
+  const lang = r.language
+    ? `<span class="lang-dot" style="color:${lc};background:${lc}18;border:1px solid ${lc}30">● ${r.language}</span>` : '';
+  const bo  = r.is_breakout ? '<span class="bo-badge">🚀 BREAKOUT</span>' : '';
+  const vel = r.delta_7d > 0
+    ? `<span class="vel-badge ${r.delta_7d>2000?'hot':''}">▲ ${fmt(r.delta_7d)}/wk</span>` : '';
+  const why = r.why
+    ? `<div class="rc-why">💡 ${r.why}</div>` : '';
 
-  function rankClass(rank) {
-    if (rank === 1) return 'rank-1';
-    if (rank === 2) return 'rank-2';
-    if (rank === 3) return 'rank-3';
-    return 'rank-other';
-  }
+  return `
+  <a class="rcard ${rankClass(r.rank)} ${r.is_breakout?'bo':''}" href="${r.url}" target="_blank" rel="noopener noreferrer">
+    <div class="rc-top">
+      <span class="rc-rank ${r.rank>3?'other':''}">${rankLabel(r.rank)}</span>
+      <img class="av" src="${r.owner_avatar}" loading="lazy" onerror="this.remove()">
+      <span class="rc-name">${r.full_name}</span>
+      ${bo}${lang}
+    </div>
+    <div class="rc-desc">${r.description || '<em style="opacity:.4">No description</em>'}</div>
+    <div class="rc-sig">
+      <span class="sig stars">⭐ <b>${fmt(r.stars)}</b></span>
+      <span class="sig forks">🍴 <b>${fmt(r.forks)}</b></span>
+      ${r.open_issues>0?`<span class="sig">🐛 <b>${fmt(r.open_issues)}</b></span>`:''}
+      <span class="sig score">⚡ <b>${r.score?.toFixed(1)||'—'}</b></span>
+      ${vel}
+    </div>
+    ${why}
+  </a>`;
+}
 
-  // ── STATS BAR ─────────────────────────────────────────────────────────────
-  async function loadStats() {
-    try {
-      const r = await fetch('/api/stats');
-      if (!r.ok) return;
-      const s = await r.json();
-      if (s.total_repos > 0) {
-        document.getElementById('statTotal').textContent = s.total_repos.toLocaleString();
-        document.getElementById('statBreakouts').textContent = s.breakouts.toLocaleString();
-        document.getElementById('statPapers').textContent = s.total_papers.toLocaleString();
-        const lu = s.last_updated ? new Date(s.last_updated).toLocaleDateString() : '—';
-        document.getElementById('statUpdated').textContent = lu;
-      }
-    } catch(e) {}
-  }
+// ── TOP 10 × 10 VIEW ────────────────────────────────────────────────────────
+function renderTop10(data) {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  let html = '';
+  let total = 0;
 
-  function setSrcBadge(source) {
-    const el = document.getElementById('srcBadge');
-    if (!source) { el.style.display = 'none'; return; }
-    el.style.display = 'inline';
-    el.className = 'src-badge ' + (source === 'db' ? 'src-db' : 'src-live');
-    el.textContent = source === 'db' ? '📚 DB' : '🌐 LIVE';
-  }
+  for (const cat of data) {
+    let repos = cat.repos;
+    if (q) repos = repos.filter(r =>
+      (r.full_name||'').toLowerCase().includes(q) ||
+      (r.description||'').toLowerCase().includes(q) ||
+      (r.language||'').toLowerCase().includes(q)
+    );
+    if (q && !repos.length) continue;
+    total += repos.length;
 
-  // ── REPO CARD ─────────────────────────────────────────────────────────────
-  function repoCard(r, idx) {
-    const rank = r.rank || (idx + 1);
-    const lc = LANG_CLR[r.language] || '#8b949e';
-    const langHtml = r.language
-      ? `<span class="lang-tag" style="color:${lc};background:${lc}12;border:1px solid ${lc}28">● ${r.language}</span>` : '';
+    const velPill = cat.velocity_7d > 0
+      ? `<span class="cat-pill vel">▲ ${fmt(cat.velocity_7d)}/wk</span>` : '';
 
-    const platClass = r.platform === 'gitlab' ? 'plat-gitlab' : 'plat-github';
-    const platLabel = r.platform === 'gitlab' ? 'GL' : 'GH';
-
-    // Velocity — use delta_7d from DB, fallback to stars_gained from scrape
-    const delta7d = r.delta_7d || 0;
-    const starsGained = r.stars_gained || delta7d;
-    const gainedHtml = starsGained > 0
-      ? `<span class="gained ${starsGained > 1000 ? 'hot' : ''}">▲ ${fmt(starsGained)} ${gainLabel()}</span>` : '';
-
-    const vel7 = r.delta_7d > 0 ? `<span class="vel-pill">▲${fmt(r.delta_7d)} 7d</span>` : '';
-    const vel30 = r.delta_30d > 0 ? `<span class="vel-pill">▲${fmt(r.delta_30d)} 30d</span>` : '';
-    const velHtml = (vel7 || vel30) && !(r.stars_gained) ? (vel7 + vel30) : '';
-
-    const scoreHtml = r.score > 0 ? `<span class="score-pill">⚡${r.score.toFixed(1)}</span>` : '';
-
-    const topicsHtml = (r.topics || []).slice(0, 4).map(t => `<span class="tag">${t}</span>`).join('');
-    const insightHtml = r.insight
-      ? `<div class="insight"><span class="ico">🔮</span><span>${r.insight}</span></div>` : '';
-    const createdHtml = r.created_at ? `<span class="st-meta">🕒 ${relTime(r.created_at)}</span>` : '';
-    const forksHtml = r.forks ? `<span class="st-meta">🍴 ${fmt(r.forks)}</span>` : '';
-
-    const rankLabel = rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : `#${rank}`;
-    const breakoutBadge = r.is_breakout ? `<span class="breakout-badge">🚀 BREAKOUT</span>` : '';
-    const isBreakoutClass = r.is_breakout ? ' breakout-card' : '';
-
-    return `
-    <a class="card ${rankClass(rank)}${isBreakoutClass}" href="${r.url}" target="_blank" rel="noopener noreferrer">
-      <div class="card-badges">
-        ${breakoutBadge}
-        <span class="rank-badge">${rankLabel}</span>
+    html += `
+    <div class="cat-block" id="cat-${cat.id}">
+      <div class="cat-hdr">
+        <span class="cat-icon">${cat.icon}</span>
+        <span class="cat-title">${cat.label}</span>
+        <div class="cat-meta">
+          <span class="cat-pill stars">⭐ ${fmt(cat.total_stars)} total</span>
+          <span class="cat-pill">${cat.total_repos} repos in library</span>
+          ${velPill}
+          <a class="cat-see-more" href="#" onclick="loadCategory('${cat.id}');return false">
+            See all ${cat.total_repos} →
+          </a>
+        </div>
       </div>
-      <div class="card-hdr">
-        <img class="av" src="${r.owner_avatar}" loading="lazy" onerror="this.remove()">
-        <span class="repo-link">${r.full_name}</span>
-        <span class="plat-badge ${platClass}">${platLabel}</span>
-        ${langHtml}
+      <div class="repo-list">
+        ${repos.map(r => repoCard(r)).join('')}
       </div>
-      <div class="desc">${r.description || '<em style="opacity:.4">No description</em>'}</div>
-      <div class="stats">
-        <span class="stars">⭐ ${fmt(r.stars)}</span>
-        ${gainedHtml}${velHtml}${forksHtml}${createdHtml}${scoreHtml}
-      </div>
-      ${topicsHtml ? `<div class="topics">${topicsHtml}</div>` : ''}
-      ${insightHtml}
-    </a>`;
-  }
-
-  // ── CONTRIBUTOR CARD ──────────────────────────────────────────────────────
-  function contribCard(c, idx) {
-    const rank = idx + 1;
-    const rankLabel = rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : `#${rank}`;
-    const topRepo = c.top_repo ? c.top_repo.split('/')[1] || c.top_repo : '';
-    return `
-    <div class="contrib-card">
-      <div class="contrib-rank">${rankLabel}</div>
-      <div class="contrib-info">
-        <div class="contrib-name">${c.owner}</div>
-        <div class="contrib-meta">${c.repo_count} repos${topRepo ? ` · ${topRepo}` : ''}</div>
-      </div>
-      <div class="contrib-stars">⭐ ${fmt(c.total_stars)}</div>
     </div>`;
   }
 
-  // ── PAPER CARD ────────────────────────────────────────────────────────────
-  function paperCard(p) {
-    const note = p.why_notable || p.abstract || (p.summary ? p.summary.slice(0, 200) + '…' : '');
-    const aid = p.arxiv_id || '';
-    return `
-    <a class="paper" href="${p.url}" target="_blank" rel="noopener noreferrer">
-      <div class="p-title">${p.title}</div>
-      <div class="p-authors">${p.authors || ''}</div>
-      ${note ? `<div class="p-note">${note.slice(0,220)}${note.length>220?'…':''}</div>` : ''}
-      <div class="p-badges">
-        ${aid ? `<span class="pbadge pbadge-ax">arXiv:${aid}</span>` : ''}
-        <span class="pbadge pbadge-src">${p.source === 'arxiv' ? 'arXiv' : 'Perplexity'}</span>
+  if (!html) html = `<div class="empty"><div class="ei">🔭</div><h3>No results for "${q}"</h3></div>`;
+  document.getElementById('page').innerHTML = html;
+  document.getElementById('statChip').innerHTML = `<b>${total}</b> repos shown`;
+
+  // Build category nav tabs from data
+  const tabHtml = data.map(c =>
+    `<button class="ntab" data-view="cat-${c.id}" onclick="scrollToCat('${c.id}',this)">${c.icon} ${c.label}</button>`
+  ).join('');
+  document.getElementById('catTabs').innerHTML = tabHtml;
+}
+
+function scrollToCat(id, el) {
+  if (currentView !== 'top10') { setView('top10', document.querySelector('[data-view=top10]')); }
+  setTimeout(() => {
+    const el2 = document.getElementById('cat-' + id);
+    if (el2) el2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+// ── CATEGORY FULL VIEW ───────────────────────────────────────────────────────
+async function loadCategory(catId) {
+  setPageLoading(6);
+  try {
+    const resp = await fetch(`/api/trending?category=${catId}&period=week&sort=score&limit=50`);
+    const j    = await resp.json();
+    const repos = (j.data || []).map((r, i) => ({ ...r, rank: i+1, why: makeWhy(r) }));
+    const cat   = top10Data?.data?.find(c => c.id === catId);
+    const label = cat ? `${cat.icon} ${cat.label}` : catId;
+
+    let html = `<div class="cat-block">
+      <div class="cat-hdr">
+        <span class="cat-title" style="font-size:16px">${label}</span>
+        <div class="cat-meta">
+          <span class="cat-pill stars">⭐ ${fmt(cat?.total_stars||0)}</span>
+          <button class="cat-see-more" onclick="setView('top10',document.querySelector('[data-view=top10]'))">← Back to Top 10</button>
+        </div>
       </div>
+      <div class="repo-list">${repos.map(r=>repoCard(r)).join('')}</div>
+    </div>`;
+    document.getElementById('page').innerHTML = html;
+    document.getElementById('statChip').innerHTML = `<b>${repos.length}</b> repos`;
+  } catch(e) {
+    document.getElementById('page').innerHTML = `<div class="empty"><div class="ei">⚠️</div><h3>${e.message}</h3></div>`;
+  }
+}
+
+function makeWhy(r) {
+  if (r.insight) return r.insight;
+  const parts = [];
+  if (r.is_breakout)     parts.push(`🚀 Breakout — ▲${fmt(r.delta_7d)} stars this week`);
+  if (r.delta_7d > 500)  parts.push(`▲${fmt(r.delta_7d)}/wk momentum`);
+  if (r.forks > 20000)   parts.push(`🍴 ${fmt(r.forks)} forks — devs build on it`);
+  else if (r.forks > 5000) parts.push(`🍴 ${fmt(r.forks)} forks`);
+  if (r.stars > 100000)  parts.push(`⭐ ${fmt(r.stars)} — industry standard`);
+  else if (r.stars > 50000) parts.push(`⭐ ${fmt(r.stars)} — widely adopted`);
+  if (!parts.length)     parts.push(`Score ${r.score?.toFixed(1)||'—'} composite ranking`);
+  return parts.slice(0,2).join(' · ');
+}
+
+// ── BREAKOUTS ────────────────────────────────────────────────────────────────
+async function loadBreakouts() {
+  setPageLoading(4);
+  const resp = await fetch('/api/breakouts?limit=50');
+  const j    = await resp.json();
+  const repos = (j.data||[]).map((r,i)=>({...r,rank:i+1,why:makeWhy(r)}));
+  if (!repos.length) {
+    document.getElementById('page').innerHTML = `<div class="empty"><div class="ei">🚀</div><h3>No breakouts yet — check back tomorrow</h3></div>`;
+    return;
+  }
+  document.getElementById('page').innerHTML = `
+    <div class="cat-hdr" style="margin-bottom:14px">
+      <span class="cat-icon">🚀</span>
+      <span class="cat-title">Breakout Repos — gaining 15%+ stars this week</span>
+      <div class="cat-meta"><span class="cat-pill">${repos.length} breakouts</span></div>
+    </div>
+    <div class="breakout-grid">${repos.map(r=>repoCard(r)).join('')}</div>`;
+  document.getElementById('statChip').innerHTML = `<b>${repos.length}</b> breakouts`;
+}
+
+// ── CONTRIBUTORS ─────────────────────────────────────────────────────────────
+async function loadContributors() {
+  setPageLoading(4);
+  const resp = await fetch('/api/contributors?limit=100');
+  const j    = await resp.json();
+  const cs   = j.data||[];
+  const html = cs.map((c,i) => {
+    const rank = i+1;
+    const rl   = rank<=3?['🥇','🥈','🥉'][rank-1]:`#${rank}`;
+    const top  = c.top_repo?.split('/')[1]||'';
+    return `<div class="ccard">
+      <div class="crank">${rl}</div>
+      <div class="cinfo">
+        <div class="cname"><a href="https://github.com/${c.owner}" target="_blank" style="color:var(--blue);text-decoration:none">${c.owner}</a></div>
+        <div class="cmeta">${c.repo_count} repos in library${top?` · top: ${top}`:''}</div>
+      </div>
+      <div class="cstars">⭐ ${fmt(c.total_stars)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('page').innerHTML = `
+    <div class="cat-hdr" style="margin-bottom:14px">
+      <span class="cat-icon">👑</span>
+      <span class="cat-title">Top Contributors — orgs & developers by total star power</span>
+      <div class="cat-meta"><span class="cat-pill">${cs.length} contributors</span></div>
+    </div>
+    <div class="contrib-grid">${html}</div>`;
+  document.getElementById('statChip').innerHTML = `<b>${cs.length}</b> contributors`;
+}
+
+// ── PAPERS ───────────────────────────────────────────────────────────────────
+async function loadPapers() {
+  setPageLoading(3);
+  const resp = await fetch('/api/papers?category=all&period=week');
+  const j    = await resp.json();
+  const ps   = j.data||[];
+  const html = ps.map(p => {
+    const note = p.why_notable||p.abstract||'';
+    return `<a class="pcard" href="${p.url}" target="_blank" rel="noopener noreferrer">
+      <div class="pt">${p.title}</div>
+      <div class="pa">${p.authors||''}</div>
+      ${note?`<div class="pn">${note.slice(0,200)}${note.length>200?'…':''}</div>`:''}
+      <div><span class="pbadge">${p.source==='arxiv'?'arXiv':'Perplexity'}</span></div>
     </a>`;
-  }
+  }).join('');
+  document.getElementById('page').innerHTML = `
+    <div class="cat-hdr" style="margin-bottom:14px">
+      <span class="cat-icon">📄</span><span class="cat-title">Trending Research Papers</span>
+    </div>
+    <div class="papers-grid">${html||'<div class="empty"><div class="ei">📄</div><h3>No papers yet</h3></div>'}</div>`;
+  document.getElementById('statChip').innerHTML = `<b>${ps.length}</b> papers`;
+}
 
-  // ── RENDER ────────────────────────────────────────────────────────────────
-  function showSkeletons(n=8) {
-    document.getElementById('grid').innerHTML = Array(n).fill('<div class="sk"></div>').join('');
-    document.getElementById('papersSec').style.display = 'none';
-  }
+// ── VIEW CONTROLLER ──────────────────────────────────────────────────────────
+function setPageLoading(n=8) {
+  document.getElementById('page').innerHTML =
+    Array(n).fill('<div class="sk" style="height:100px;margin-bottom:8px"></div>').join('');
+}
 
-  function render(repos) {
-    const grid = document.getElementById('grid');
-    if (!repos.length) {
-      grid.innerHTML = `<div class="empty"><div class="ei">🔭</div><h3>No repos found</h3><p>Try a different category, period, or run the bootstrap collector.</p></div>`;
-      document.getElementById('countPill').innerHTML = '<b>0</b> repos';
-      return;
+async function setView(view, el) {
+  currentView = view;
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('q').value = '';
+
+  if (view === 'top10') {
+    await loadTop10();
+  } else if (view === 'breakouts') {
+    await loadBreakouts();
+  } else if (view === 'contributors') {
+    await loadContributors();
+  } else if (view === 'papers') {
+    await loadPapers();
+  }
+}
+
+async function loadTop10(force=false) {
+  if (top10Data && !force) { renderTop10(top10Data.data); return; }
+  setPageLoading(8);
+  try {
+    const resp = await fetch('/api/top10' + (force?'?bust='+Date.now():''));
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    top10Data = await resp.json();
+    renderTop10(top10Data.data);
+    // also update stats bar
+    loadStats();
+  } catch(e) {
+    document.getElementById('page').innerHTML =
+      `<div class="empty"><div class="ei">⚠️</div><h3>${e.message}</h3>
+       <p style="margin-top:8px">Make sure the server is running on :8080</p></div>`;
+  }
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const s = await r.json();
+    if (s.total_repos) {
+      document.getElementById('statChip').innerHTML =
+        `📚 <b>${s.total_repos.toLocaleString()}</b> repos · 🚀 <b>${s.breakouts}</b> breakouts`;
     }
-    grid.innerHTML = repos.map((r, i) => repoCard(r, i)).join('');
-    document.getElementById('countPill').innerHTML = `<b>${repos.length}</b> repos`;
-  }
+  } catch(e){}
+}
 
-  function renderContributors(contribs) {
-    document.getElementById('papersSec').style.display = 'none';
-    const grid = document.getElementById('grid');
-    if (!contribs.length) {
-      grid.innerHTML = `<div class="empty"><div class="ei">👑</div><h3>No contributors yet</h3><p>Run bootstrap to populate the library.</p></div>`;
-      document.getElementById('countPill').innerHTML = '<b>0</b> contributors';
-      return;
-    }
-    grid.className = 'contrib-grid';
-    grid.innerHTML = contribs.map((c, i) => contribCard(c, i)).join('');
-    document.getElementById('countPill').innerHTML = `<b>${contribs.length}</b> contributors`;
-  }
+function hardRefresh() {
+  fetch('/api/cache/clear').then(()=>{ top10Data=null; setView(currentView, document.querySelector(`.ntab[data-view="${currentView}"]`)); });
+}
 
-  function renderPapers(papers) {
-    const sec = document.getElementById('papersSec');
-    if (!papers?.length) { sec.style.display = 'none'; return; }
-    sec.style.display = 'block';
-    document.getElementById('pgrid').innerHTML = papers.map(paperCard).join('');
-  }
+// Search
+document.getElementById('q').addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(()=>{
+    if (currentView==='top10' && top10Data) renderTop10(top10Data.data);
+  }, 250);
+});
 
-  // ── FETCH ─────────────────────────────────────────────────────────────────
-  async function load(force=false) {
-    if (loading && !force) return;
-    loading = true;
-
-    document.getElementById('grid').className = 'grid';
-    document.getElementById('cacheTag').style.display = 'none';
-    setSrcBadge(null);
-
-    if (force) { try { await fetch('/api/cache/clear'); } catch(e){} }
-
-    // Special views
-    if (cat === 'papers') {
-      loading = false;
-      showSkeletons(6);
-      const resp = await fetch(`/api/papers?category=all&period=${period}`).catch(() => null);
-      if (!resp?.ok) {
-        document.getElementById('grid').innerHTML = '<div class="empty"><div class="ei">⚠️</div><h3>Failed to load papers</h3></div>';
-        return;
-      }
-      const j = await resp.json();
-      document.getElementById('grid').innerHTML = '';
-      renderPapers(j.data || []);
-      document.getElementById('countPill').innerHTML = `<b>${j.count||0}</b> papers`;
-      document.getElementById('tsLabel').textContent = new Date().toLocaleTimeString();
-      return;
-    }
-
-    if (cat === 'contributors') {
-      loading = false;
-      showSkeletons(6);
-      const resp = await fetch('/api/contributors?limit=100').catch(() => null);
-      if (!resp?.ok) {
-        document.getElementById('grid').innerHTML = '<div class="empty"><div class="ei">⚠️</div><h3>No contributors data</h3></div>';
-        return;
-      }
-      const j = await resp.json();
-      renderContributors(j.data || []);
-      document.getElementById('tsLabel').textContent = new Date().toLocaleTimeString();
-      setSrcBadge('db');
-      return;
-    }
-
-    if (cat === 'breakouts') {
-      loading = false;
-      showSkeletons(6);
-      const resp = await fetch('/api/breakouts?limit=25').catch(() => null);
-      if (!resp?.ok) {
-        document.getElementById('grid').innerHTML = '<div class="empty"><div class="ei">🚀</div><h3>No breakouts yet</h3></div>';
-        return;
-      }
-      const j = await resp.json();
-      allRepos = j.data || [];
-      render(allRepos);
-      document.getElementById('tsLabel').textContent = new Date().toLocaleTimeString();
-      setSrcBadge('db');
-      return;
-    }
-
-    showSkeletons();
-    const plats = [ghOn && 'github', glOn && 'gitlab'].filter(Boolean).join(',') || 'github';
-
-    try {
-      const url = `/api/trending?period=${period}&category=${cat}&limit=25&platforms=${plats}&sort=${sortBy}`;
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const j = await resp.json();
-      allRepos = j.data || [];
-      loading = false;
-
-      render(allRepos);
-      setSrcBadge(j.source || null);
-
-      if (j.cached) { const ct = document.getElementById('cacheTag'); ct.style.display='inline'; }
-      document.getElementById('tsLabel').textContent = new Date().toLocaleTimeString();
-
-      fetchPapers();
-    } catch(err) {
-      loading = false;
-      document.getElementById('grid').innerHTML =
-        `<div class="empty"><div class="ei">⚠️</div><h3>Error: ${err.message}</h3><p>Make sure the server is running on :8080.</p></div>`;
-    }
-  }
-
-  async function fetchPapers() {
-    try {
-      const paperCat = cat === 'all' ? 'llm' : cat;
-      const resp = await fetch(`/api/papers?category=${paperCat}&period=${period}`);
-      if (!resp.ok) return;
-      const j = await resp.json();
-      renderPapers(j.data || []);
-    } catch(e) {}
-  }
-
-  async function doSearch(q) {
-    if (!q || q.length < 2) { render(allRepos); return; }
-    showSkeletons(6);
-    try {
-      const resp = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=25`);
-      if (!resp.ok) throw new Error();
-      const j = await resp.json();
-      render(j.data || []);
-    } catch(e) {
-      // fallback to client-side filter
-      const filtered = allRepos.filter(r =>
-        (r.full_name||'').toLowerCase().includes(q.toLowerCase()) ||
-        (r.description||'').toLowerCase().includes(q.toLowerCase()) ||
-        (r.language||'').toLowerCase().includes(q.toLowerCase()) ||
-        (r.topics||[]).some(t => t.toLowerCase().includes(q.toLowerCase()))
-      );
-      render(filtered);
-    }
-  }
-
-  // ── CONTROLS ──────────────────────────────────────────────────────────────
-  function setCat(c, el) {
-    cat = c;
-    document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById('q').value = '';
-    load();
-  }
-
-  function setPeriod(p, el) {
-    period = p;
-    document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    load();
-  }
-
-  function setSort(s, el) {
-    sortBy = s;
-    document.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    load();
-  }
-
-  function togglePlatform(p) {
-    if (p === 'github') {
-      ghOn = !ghOn;
-      document.getElementById('togGH').classList.toggle('on', ghOn);
-    } else {
-      glOn = !glOn;
-      document.getElementById('togGL').classList.toggle('on', glOn);
-    }
-    load();
-  }
-
-  function hardRefresh() { load(true); }
-
-  document.getElementById('q').addEventListener('input', function() {
-    clearTimeout(searchTimer);
-    const q = this.value.trim();
-    if (!q) { render(allRepos); return; }
-    searchTimer = setTimeout(() => doSearch(q), 350);
-  });
-
-  // Auto-refresh every 10 minutes
-  setInterval(() => load(false), 600_000);
-
-  // Boot
-  loadStats();
-  load();
+// Boot
+loadStats();
+loadTop10();
 </script>
 </body>
 </html>

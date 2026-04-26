@@ -241,6 +241,105 @@ def papers(
     return {"data": combined, "cached": False, "count": len(combined), "source": "live"}
 
 
+# Top 10 categories ranked by composite signal (total_stars × avg_score + velocity)
+TOP10_CATS = [
+    {"id": "softeng",    "label": "Dev Tools",        "icon": "⚙️"},
+    {"id": "research",   "label": "AI Research",       "icon": "🔬"},
+    {"id": "finance",    "label": "Finance / Trading",  "icon": "💰"},
+    {"id": "codex",      "label": "OpenAI / Codex",    "icon": "🧩"},
+    {"id": "cyber",      "label": "Cybersecurity",     "icon": "🔐"},
+    {"id": "qa",         "label": "QA / Testing",      "icon": "🧪"},
+    {"id": "data",       "label": "Data Engineering",  "icon": "📊"},
+    {"id": "claude",     "label": "Claude / AI",       "icon": "🟣"},
+    {"id": "animations", "label": "Animation / 3D",    "icon": "✨"},
+    {"id": "memory",     "label": "RAG / Memory",      "icon": "🧠"},
+]
+
+
+def _why(r: dict) -> str:
+    """Generate a one-line human explanation for why this repo ranks here."""
+    parts = []
+    if r.get("insight"):
+        return r["insight"]
+    if r.get("is_breakout"):
+        parts.append(f"🚀 Breakout — ▲{r['delta_7d']:,} stars this week")
+    if r.get("delta_7d", 0) > 500:
+        parts.append(f"▲{r['delta_7d']:,}/wk momentum")
+    if r.get("forks", 0) > 20000:
+        parts.append(f"🍴 {r['forks']:,} forks — devs build on it")
+    elif r.get("forks", 0) > 5000:
+        parts.append(f"🍴 {r['forks']:,} forks")
+    if r.get("stars", 0) > 100000:
+        parts.append(f"⭐ {r['stars']:,} stars — industry standard")
+    elif r.get("stars", 0) > 50000:
+        parts.append(f"⭐ {r['stars']:,} stars — widely adopted")
+    if not parts:
+        parts.append(f"Top-ranked in category by score {r.get('score', 0):.1f}")
+    return " · ".join(parts[:2])
+
+
+@app.get("/api/top10")
+def top10():
+    key = "top10"
+    cached = _get(key, CACHE_TTL)
+    if cached:
+        return {"data": cached, "cached": True}
+
+    import sqlite3, json as _json
+    result = []
+
+    for cat in TOP10_CATS:
+        cid = cat["id"]
+
+        # Pull top 10 by composite score for this category
+        con = sqlite3.connect(str(DB_PATH))
+        con.row_factory = sqlite3.Row
+        rows = con.execute(
+            """SELECT * FROM repos
+               WHERE categories LIKE ?
+               ORDER BY score DESC, stars DESC
+               LIMIT 10""",
+            (f'%"{cid}"%',),
+        ).fetchall()
+
+        # Category-level signal
+        meta = con.execute(
+            """SELECT COUNT(*) as cnt, SUM(stars) as ts, ROUND(AVG(score),2) as as_,
+                      SUM(delta_7d) as vel, MAX(stars) as top_s
+               FROM repos WHERE categories LIKE ?""",
+            (f'%"{cid}"%',),
+        ).fetchone()
+        con.close()
+
+        repos = []
+        for rank, row in enumerate(rows, 1):
+            r = dict(row)
+            # Parse JSON fields
+            for f in ("topics", "categories"):
+                if isinstance(r.get(f), str):
+                    try:
+                        r[f] = _json.loads(r[f])
+                    except Exception:
+                        r[f] = []
+            r["rank"] = rank
+            r["why"] = _why(r)
+            repos.append(r)
+
+        result.append({
+            "id":          cid,
+            "label":       cat["label"],
+            "icon":        cat["icon"],
+            "total_repos": meta["cnt"] if meta else 0,
+            "total_stars": meta["ts"] if meta else 0,
+            "avg_score":   meta["as_"] if meta else 0,
+            "velocity_7d": meta["vel"] if meta else 0,
+            "repos":       repos,
+        })
+
+    _set(key, result)
+    return {"data": result, "cached": False}
+
+
 @app.get("/api/stats")
 def stats():
     try:
