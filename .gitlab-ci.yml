@@ -28,35 +28,41 @@ test:
   rules:
     - if: $CI_COMMIT_BRANCH
 
-# ── Deploy to Railway (main branch only) ──────────────────────────────────────
+# ── Deploy to Railway (main branch, only when RAILWAY_TOKEN is set) ───────────
 deploy:
   stage: deploy
   image: node:20-slim
   before_script:
     - npm install -g @railway/cli --quiet
   script:
+    - |
+      if [ -z "$RAILWAY_TOKEN" ]; then
+        echo "RAILWAY_TOKEN not set — skipping deploy. Add it in GitLab CI/CD variables."
+        exit 0
+      fi
     - railway up --detach --service starpulse
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: true
   environment:
     name: production
     url: $RAILWAY_PUBLIC_URL
 
-# ── Daily collect (cron schedule — set in GitLab UI: 0 3 * * *) ──────────────
-# GitLab: Settings → CI/CD → Pipeline schedules → Add → "0 3 * * *" on main
+# ── Daily collect (cron — set in GitLab: Settings → CI/CD → Schedules → 0 3 * * *) ──
 daily-collect:
   stage: collect
   image: alpine/curl:latest
   script:
     - |
-      echo "Triggering daily collect on Railway..."
-      STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-        "${RAILWAY_PUBLIC_URL}/api/admin/collect?secret=${ADMIN_SECRET}&mode=daily")
-      if [ "$STATUS" = "200" ]; then
-        echo "Daily collect started successfully"
-      else
-        echo "Collect trigger failed with HTTP $STATUS"
-        exit 1
+      if [ -z "$RAILWAY_PUBLIC_URL" ] || [ -z "$ADMIN_SECRET" ]; then
+        echo "RAILWAY_PUBLIC_URL or ADMIN_SECRET not set — skipping collect trigger."
+        exit 0
       fi
+      echo "Triggering daily collect on $RAILWAY_PUBLIC_URL ..."
+      HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+        "${RAILWAY_PUBLIC_URL}/api/admin/collect?secret=${ADMIN_SECRET}&mode=daily")
+      echo "Response: HTTP $HTTP"
+      [ "$HTTP" = "200" ] || exit 1
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: true
