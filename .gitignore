@@ -9,3 +9,11 @@ venv/
 dist/
 build/
 .pytest_cache/
+# DB files — stored on Railway Volume, never in git
+starpulse.db
+starpulse.db-shm
+starpulse.db-wal
+# Runtime logs
+*.log
+# One-shot scripts
+fix_boost.py

@@ -6,16 +6,37 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from github_client import search_repos, scrape_trending
+from db import (
+    init_db, query_repos, search_repos_fts, query_papers,
+    query_contributors, get_stats, DB_PATH,
+)
+from github_client import search_repos as gh_live, scrape_trending
 from gitlab_client import search_gitlab_repos
 from perplexity_client import enrich_repos, trending_papers as pplx_papers
 from arxiv_client import search_papers
 
 app = FastAPI(title="StarPulse")
 
+# Init DB schema on startup (no-op if tables already exist)
+init_db()
+
+# Auto-bootstrap on first deploy if DB is empty and token is available
+import threading
+
+def _maybe_bootstrap():
+    try:
+        if get_stats()["total_repos"] == 0 and os.getenv("GITHUB_TOKEN"):
+            print("[startup] Empty DB detected — running bootstrap in background...")
+            import subprocess, sys
+            subprocess.Popen([sys.executable, "collect.py", "--mode", "bootstrap"])
+    except Exception as e:
+        print(f"[startup] bootstrap check failed: {e}")
+
+threading.Thread(target=_maybe_bootstrap, daemon=True).start()
+
 _cache: dict = {}
 CACHE_TTL = int(os.getenv("CACHE_TTL", 600))
-PPLX_TTL = int(os.getenv("PPLX_CACHE_TTL", 3600))
+PPLX_TTL  = int(os.getenv("PPLX_CACHE_TTL", 3600))
 
 TRENDING_PERIOD_MAP = {"now": "daily", "today": "daily", "week": "weekly", "month": "monthly"}
 
@@ -31,6 +52,17 @@ def _set(key: str, data):
     _cache[key] = (time.time(), data)
 
 
+def _db_has_data() -> bool:
+    try:
+        return get_stats()["total_repos"] > 0
+    except Exception:
+        return False
+
+
+def _sort_param(sort: str) -> str:
+    return sort if sort in ("score", "stars", "delta7d", "delta30d", "forks") else "score"
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     path = os.path.join(os.path.dirname(__file__), "static", "index.html")
@@ -40,53 +72,75 @@ def index():
 
 @app.get("/api/trending")
 def trending(
-    period: str = Query("week"),
+    period: str   = Query("week"),
     category: str = Query("all"),
-    limit: int = Query(25, le=50),
+    limit: int    = Query(25, le=50),
     platforms: str = Query("github,gitlab"),
+    sort: str     = Query("score"),
 ):
-    key = f"trending:{period}:{category}:{platforms}"
+    key = f"trending:{period}:{category}:{platforms}:{sort}:{limit}"
     cached = _get(key, CACHE_TTL)
     if cached:
-        return {"data": cached, "cached": True, "count": len(cached)}
+        return {"data": cached, "cached": True, "count": len(cached), "source": "cache"}
 
+    sort_col = _sort_param(sort)
+
+    # ── DB path (fast, owned library) ────────────────────────────────────────
+    if _db_has_data():
+        platform_filter = "all"
+        if platforms == "github":
+            platform_filter = "github"
+        elif platforms == "gitlab":
+            platform_filter = "gitlab"
+
+        repos = query_repos(
+            category=category,
+            sort=sort_col,
+            limit=limit,
+            platform=platform_filter,
+        )
+        for i, r in enumerate(repos):
+            r["rank"] = i + 1
+            if "topics" in r and isinstance(r["topics"], str):
+                import json
+                r["topics"] = json.loads(r["topics"])
+            if "categories" in r and isinstance(r["categories"], str):
+                import json
+                r["categories"] = json.loads(r["categories"])
+
+        _set(key, repos)
+        return {"data": repos, "cached": False, "count": len(repos), "source": "db"}
+
+    # ── Live API fallback (before bootstrap runs) ─────────────────────────────
     use_github = "github" in platforms
     use_gitlab = "gitlab" in platforms
+    repos_live = []
 
-    repos = []
-
-    # ── GitHub ──────────────────────────────────────────────
     if use_github:
-        gh_repos = search_repos(period, category, per_page=min(limit, 25))
-        repos.extend(gh_repos)
-
-        # Add velocity-based trending for broad categories
-        if category in ("all",) and period in TRENDING_PERIOD_MAP:
+        gh_repos = gh_live(period, category, per_page=min(limit, 25))
+        repos_live.extend(gh_repos)
+        if category == "all" and period in TRENDING_PERIOD_MAP:
             scraped = scrape_trending(since=TRENDING_PERIOD_MAP[period])
-            existing = {r.full_name for r in repos}
+            existing = {r.full_name for r in repos_live}
             for r in scraped:
                 if r.full_name not in existing:
-                    repos.append(r)
+                    repos_live.append(r)
 
-    # ── GitLab ──────────────────────────────────────────────
     if use_gitlab:
         gl_repos = search_gitlab_repos(period, category, per_page=10)
-        existing = {r.full_name for r in repos}
+        existing = {r.full_name for r in repos_live}
         for r in gl_repos:
             if r.full_name not in existing:
-                repos.append(r)
+                repos_live.append(r)
 
-    # Sort by stars, assign rank
-    repos.sort(key=lambda r: r.stars, reverse=True)
-    repos = repos[:limit]
-    for i, r in enumerate(repos):
+    repos_live.sort(key=lambda r: r.stars, reverse=True)
+    repos_live = repos_live[:limit]
+    for i, r in enumerate(repos_live):
         r.rank = i + 1
 
-    # ── Perplexity enrichment (top 10, cached 1h) ───────────
     pplx_key = f"pplx:{period}:{category}"
     insight_map: dict = _get(pplx_key, PPLX_TTL) or {}
-
-    to_enrich = [r for r in repos[:10] if r.full_name not in insight_map]
+    to_enrich = [r for r in repos_live[:10] if r.full_name not in insight_map]
     if to_enrich:
         enriched = enrich_repos(to_enrich, category)
         for e in enriched:
@@ -94,25 +148,84 @@ def trending(
         _set(pplx_key, insight_map)
 
     result = []
-    for r in repos:
+    for r in repos_live:
         d = r.to_dict()
         d["insight"] = insight_map.get(r.full_name, "")
         result.append(d)
 
     _set(key, result)
-    return {"data": result, "cached": False, "count": len(result)}
+    return {"data": result, "cached": False, "count": len(result), "source": "live"}
+
+
+@app.get("/api/search")
+def search(q: str = Query(..., min_length=2), limit: int = Query(25, le=50)):
+    key = f"search:{q}:{limit}"
+    cached = _get(key, CACHE_TTL)
+    if cached:
+        return {"data": cached, "cached": True, "count": len(cached)}
+
+    results = search_repos_fts(q, limit)
+    import json
+    for i, r in enumerate(results):
+        r["rank"] = i + 1
+        if isinstance(r.get("topics"), str):
+            r["topics"] = json.loads(r["topics"])
+        if isinstance(r.get("categories"), str):
+            r["categories"] = json.loads(r["categories"])
+
+    _set(key, results)
+    return {"data": results, "cached": False, "count": len(results)}
+
+
+@app.get("/api/breakouts")
+def breakouts(limit: int = Query(25, le=50)):
+    key = f"breakouts:{limit}"
+    cached = _get(key, CACHE_TTL)
+    if cached:
+        return {"data": cached, "cached": True, "count": len(cached)}
+
+    results = query_repos(sort="score", limit=limit, breakout_only=True)
+    import json
+    for i, r in enumerate(results):
+        r["rank"] = i + 1
+        if isinstance(r.get("topics"), str):
+            r["topics"] = json.loads(r["topics"])
+        if isinstance(r.get("categories"), str):
+            r["categories"] = json.loads(r["categories"])
+
+    _set(key, results)
+    return {"data": results, "cached": False, "count": len(results)}
+
+
+@app.get("/api/contributors")
+def contributors(limit: int = Query(50, le=200)):
+    key = f"contributors:{limit}"
+    cached = _get(key, CACHE_TTL)
+    if cached:
+        return {"data": cached, "cached": True, "count": len(cached)}
+
+    results = query_contributors(limit)
+    _set(key, results)
+    return {"data": results, "cached": False, "count": len(results)}
 
 
 @app.get("/api/papers")
 def papers(
     category: str = Query("all"),
-    period: str = Query("week"),
+    period: str   = Query("week"),
 ):
     key = f"papers:{category}:{period}"
     cached = _get(key, PPLX_TTL)
     if cached:
         return {"data": cached, "cached": True, "count": len(cached)}
 
+    if _db_has_data():
+        db_papers = query_papers(category, limit=12)
+        if db_papers:
+            _set(key, db_papers)
+            return {"data": db_papers, "cached": False, "count": len(db_papers), "source": "db"}
+
+    # Live fallback
     arxiv = search_papers(category, period, max_results=8)
     pplx = pplx_papers(category, period)
 
@@ -125,13 +238,42 @@ def papers(
             combined.append(p)
 
     _set(key, combined)
-    return {"data": combined, "cached": False, "count": len(combined)}
+    return {"data": combined, "cached": False, "count": len(combined), "source": "live"}
+
+
+@app.get("/api/stats")
+def stats():
+    try:
+        s = get_stats()
+        s["db_path"] = str(DB_PATH)
+        s["db_exists"] = DB_PATH.exists()
+        return s
+    except Exception as e:
+        return {"error": str(e), "db_exists": DB_PATH.exists()}
 
 
 @app.get("/api/cache/clear")
 def clear_cache():
     _cache.clear()
     return {"status": "ok"}
+
+
+@app.get("/api/admin/collect")
+def admin_collect(secret: str = Query(...), mode: str = Query("daily")):
+    """Trigger collection from GitLab CI scheduled pipeline or manual call."""
+    expected = os.getenv("ADMIN_SECRET", "")
+    if not expected or secret != expected:
+        return JSONResponse({"error": "unauthorized"}, status_code=403)
+    if mode not in ("daily", "bootstrap", "papers"):
+        return JSONResponse({"error": "invalid mode"}, status_code=400)
+
+    import subprocess, sys
+    proc = subprocess.Popen(
+        [sys.executable, "collect.py", "--mode", mode],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    )
+    _cache.clear()
+    return {"status": "started", "mode": mode, "pid": proc.pid}
 
 
 if __name__ == "__main__":
