@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StarPulse — GitHub Trending Intelligence</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg2: #161b22;
+      --bg3: #010409;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green: #3fb950;
+      --red: #f85149;
+      --blue: #58a6ff;
+      --orange: #f0883e;
+      --purple: #bc8cff;
+      --yellow: #e3b341;
+      --accent: #1f6feb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+    /* ── Header ── */
+    .hdr {
+      display: flex; align-items: center; gap: 14px;
+      padding: 10px 20px; background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 200; height: 48px;
+    }
+    .logo { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .logo span { color: var(--yellow); }
+    .live { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: var(--green); letter-spacing: 0.8px; }
+    .dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: blink 2s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+    .search { flex: 1; max-width: 280px; position: relative; }
+    .search input {
+      width: 100%; background: var(--bg2); border: 1px solid var(--border);
+      color: var(--text); padding: 6px 12px 6px 32px; border-radius: 6px; font-size: 13px; outline: none;
+    }
+    .search input:focus { border-color: var(--blue); }
+    .search::before { content: '⌕'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
+
+    .hdr-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .btn {
+      background: var(--bg2); border: 1px solid var(--border); color: var(--muted);
+      padding: 5px 11px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.15s;
+    }
+    .btn:hover { border-color: var(--blue); color: var(--blue); }
+    .stat-pill { font-size: 11px; color: var(--muted); background: var(--bg2); border: 1px solid var(--border); padding: 4px 10px; border-radius: 12px; }
+    .stat-pill b { color: var(--text); }
+
+    /* ── Layout ── */
+    .layout { display: flex; height: calc(100vh - 48px); overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sb {
+      width: 190px; min-width: 190px; background: var(--bg3);
+      border-right: 1px solid var(--border); overflow-y: auto; padding: 10px 0;
+    }
+    .sb-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 10px 16px 4px; }
+    .sb-item {
+      display: flex; align-items: center; gap: 9px; padding: 8px 16px;
+      cursor: pointer; font-size: 13px; color: var(--muted);
+      transition: all 0.12s; border-left: 2px solid transparent;
+    }
+    .sb-item:hover { background: var(--bg2); color: var(--text); }
+    .sb-item.active { color: var(--blue); background: rgba(88,166,255,0.07); border-left-color: var(--blue); font-weight: 600; }
+    .sb-item .ic { font-size: 14px; line-height: 1; }
+    .sb-count { margin-left: auto; font-size: 10px; color: var(--muted); background: var(--bg2); padding: 1px 6px; border-radius: 8px; }
+
+    /* ── Main ── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Period bar ── */
+    .pbar {
+      display: flex; align-items: center; gap: 6px; padding: 10px 20px;
+      border-bottom: 1px solid var(--border); background: var(--bg); flex-shrink: 0;
+    }
+    .ptab {
+      padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border); color: var(--muted);
+      transition: all 0.15s;
+    }
+    .ptab:hover { border-color: var(--blue); color: var(--blue); }
+    .ptab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .pbar-info { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+    .cache-tag { font-size: 10px; background: rgba(240,136,62,0.12); color: var(--orange); padding: 2px 8px; border-radius: 10px; display: none; }
+
+    /* ── Content ── */
+    .content { flex: 1; overflow-y: auto; padding: 18px 20px; }
+
+    /* ── Repo grid ── */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+
+    /* ── Repo card ── */
+    .card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px; cursor: pointer; transition: all 0.18s; position: relative; overflow: hidden;
+    }
+    .card::after {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--blue), var(--purple));
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .card:hover { border-color: rgba(88,166,255,0.5); transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,0.4); }
+    .card:hover::after { opacity: 1; }
+
+    .card-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; min-width: 0; }
+    .av { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; }
+    .rname {
+      font-size: 13px; font-weight: 600; color: var(--blue); text-decoration: none;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+    }
+    .rname:hover { text-decoration: underline; }
+    .lang { font-size: 10px; padding: 2px 7px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+
+    .desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 9px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 36px; }
+
+    .stats { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .stars-total { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 3px; }
+    .stars-gained { font-size: 10px; font-weight: 700; color: var(--green); background: rgba(63,185,80,0.1); padding: 2px 7px; border-radius: 10px; }
+    .meta { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+
+    .topics { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+    .tag { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: rgba(188,140,255,0.07); color: var(--purple); border: 1px solid rgba(188,140,255,0.15); }
+
+    .insight {
+      display: flex; align-items: flex-start; gap: 6px; padding: 7px 9px;
+      background: rgba(31,111,235,0.06); border: 1px solid rgba(31,111,235,0.15);
+      border-radius: 6px; font-size: 11px; color: var(--muted); line-height: 1.45;
+    }
+    .insight-ico { flex-shrink: 0; font-size: 12px; margin-top: 1px; }
+
+    /* ── Papers ── */
+    .papers-hdr { font-size: 14px; font-weight: 700; margin: 24px 0 12px; display: flex; align-items: center; gap: 8px; }
+    .paper-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 13px; cursor: pointer; transition: border-color 0.15s; margin-bottom: 10px;
+    }
+    .paper-card:hover { border-color: var(--yellow); }
+    .ptitle { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
+    .pauthors { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+    .pnote { font-size: 11px; color: var(--yellow); background: rgba(227,179,65,0.07); padding: 6px 9px; border-radius: 5px; line-height: 1.4; margin-bottom: 7px; }
+    .pbadges { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pbadge { font-size: 10px; padding: 2px 8px; border-radius: 4px; }
+    .pbadge-arxiv { background: rgba(227,179,65,0.1); color: var(--yellow); border: 1px solid rgba(227,179,65,0.2); }
+    .pbadge-src { color: var(--muted); border: 1px solid var(--border); }
+
+    /* ── Skeleton ── */
+    .sk {
+      background: linear-gradient(90deg, var(--bg2) 25%, #1c2128 50%, var(--bg2) 75%);
+      background-size: 200% 100%; animation: shimmer 1.6s infinite; border-radius: 8px; height: 175px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* ── Empty ── */
+    .empty { grid-column: 1/-1; text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-ico { font-size: 44px; margin-bottom: 10px; }
+    .empty h3 { color: var(--text); margin-bottom: 6px; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .sb { display: none; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="logo"><span>★</span> StarPulse</div>
+  <div class="live"><div class="dot"></div>LIVE</div>
+  <div class="search">
+    <input type="text" id="q" placeholder="Filter repos, language, topic…" autocomplete="off">
+  </div>
+  <div class="hdr-right">
+    <div class="stat-pill" id="statPill"><b>—</b> repos</div>
+    <button class="btn" onclick="hardRefresh()">⟳ Refresh</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sb" id="sidebar">
+    <div class="sb-lbl">Category</div>
+    <div class="sb-item active" onclick="setCat('all',this)"><span class="ic">🔥</span>All Trending</div>
+    <div class="sb-item" onclick="setCat('llm',this)"><span class="ic">🤖</span>LLM / AI</div>
+    <div class="sb-item" onclick="setCat('video',this)"><span class="ic">🎬</span>Video AI</div>
+    <div class="sb-item" onclick="setCat('gtm',this)"><span class="ic">📈</span>GTM / Sales</div>
+    <div class="sb-item" onclick="setCat('cyber',this)"><span class="ic">🔐</span>Cybersecurity</div>
+    <div class="sb-item" onclick="setCat('qa',this)"><span class="ic">🧪</span>QA / Testing</div>
+    <div class="sb-item" onclick="setCat('graphics',this)"><span class="ic">🎨</span>Graphics / 3D</div>
+    <div class="sb-item" onclick="setCat('memory',this)"><span class="ic">🧠</span>AI Memory</div>
+    <div class="sb-item" onclick="setCat('softeng',this)"><span class="ic">⚙️</span>Dev Tools</div>
+    <div class="sb-lbl" style="margin-top:6px">Research</div>
+    <div class="sb-item" onclick="setCat('papers',this)"><span class="ic">📄</span>Papers</div>
+  </aside>
+
+  <main class="main">
+    <div class="pbar">
+      <button class="ptab" onclick="setPeriod('yesterday',this)">Yesterday</button>
+      <button class="ptab active" onclick="setPeriod('week',this)">This Week</button>
+      <button class="ptab" onclick="setPeriod('month',this)">This Month</button>
+      <button class="ptab" onclick="setPeriod('year',this)">This Year</button>
+      <div class="pbar-info">
+        <span id="cacheTag" class="cache-tag">CACHED</span>
+        <span id="tsLabel"></span>
+      </div>
+    </div>
+
+    <div class="content" id="content">
+      <div class="grid" id="grid"></div>
+      <div id="papersSection" style="display:none">
+        <div class="papers-hdr">📄 Trending Research Papers</div>
+        <div id="papersGrid"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  let cat = 'all', period = 'week', allRepos = [], loading = false;
+
+  const LANG_COLOR = {
+    Python:'#3572A5',JavaScript:'#f1e05a',TypeScript:'#3178c6',Go:'#00ADD8',
+    Rust:'#dea584',Java:'#b07219','C++':'#f34b7d',C:'#555555',Ruby:'#701516',
+    Swift:'#F05138',Kotlin:'#A97BFF',Dart:'#00B4AB',PHP:'#4F5D95',Shell:'#89e051',
+    HTML:'#e34c26',CSS:'#563d7c',Vue:'#4FC08D',Lua:'#000080',R:'#198CE7',
+    'Jupyter Notebook':'#DA5B0B',Scala:'#c22d40',Elixir:'#6e4a7e',
+  };
+
+  function fmt(n) {
+    if (!n) return '0';
+    return n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n);
+  }
+
+  function relTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso), now = new Date();
+    const diff = (now - d) / 86400000;
+    if (diff < 1) return 'today';
+    if (diff < 2) return 'yesterday';
+    if (diff < 30) return Math.floor(diff)+'d ago';
+    if (diff < 365) return Math.floor(diff/30)+'mo ago';
+    return Math.floor(diff/365)+'y ago';
+  }
+
+  function repoCard(r) {
+    const lc = LANG_COLOR[r.language] || '#8b949e';
+    const langHtml = r.language
+      ? `<span class="lang" style="color:${lc};background:${lc}14;border:1px solid ${lc}30">● ${r.language}</span>` : '';
+    const gainHtml = r.stars_gained > 0
+      ? `<span class="stars-gained">▲ ${fmt(r.stars_gained)} ${period === 'today' ? 'today' : period === 'yesterday' ? 'yest.' : period === 'week' ? 'wk' : period === 'month' ? 'mo' : 'yr'}</span>` : '';
+    const topicsHtml = (r.topics||[]).slice(0,4).map(t=>`<span class="tag">${t}</span>`).join('');
+    const insightHtml = r.insight
+      ? `<div class="insight"><span class="insight-ico">🔮</span><span>${r.insight}</span></div>` : '';
+    const created = r.created_at ? `<span class="meta" title="Created ${r.created_at}">🕒 ${relTime(r.created_at)}</span>` : '';
+    const forks = r.forks ? `<span class="meta">🍴 ${fmt(r.forks)}</span>` : '';
+
+    return `<div class="card" onclick="open('${r.url}','_blank')">
+      <div class="card-hdr">
+        <img class="av" src="${r.owner_avatar}" loading="lazy" onerror="this.remove()">
+        <a class="rname" href="${r.url}" target="_blank" onclick="event.stopPropagation()">${r.full_name}</a>
+        ${langHtml}
+      </div>
+      <div class="desc">${r.description || '<em style="opacity:.5">No description</em>'}</div>
+      <div class="stats">
+        <span class="stars-total">⭐ ${fmt(r.stars)}</span>
+        ${gainHtml}${forks}${created}
+      </div>
+      ${topicsHtml ? `<div class="topics">${topicsHtml}</div>` : ''}
+      ${insightHtml}
+    </div>`;
+  }
+
+  function paperCard(p) {
+    const notable = p.why_notable || (p.summary ? p.summary.slice(0,200)+'…' : '');
+    return `<div class="paper-card" onclick="open('${p.url}','_blank')">
+      <div class="ptitle">${p.title}</div>
+      <div class="pauthors">${p.authors||''}</div>
+      ${notable ? `<div class="pnote">${notable}</div>` : ''}
+      <div class="pbadges">
+        ${p.arxiv_id ? `<span class="pbadge pbadge-arxiv">arXiv:${p.arxiv_id}</span>` : ''}
+        <span class="pbadge pbadge-src">${p.source === 'arxiv' ? 'arXiv' : 'Perplexity'}</span>
+      </div>
+    </div>`;
+  }
+
+  function showSkeleton(n=8) {
+    document.getElementById('grid').innerHTML = Array(n).fill('<div class="sk"></div>').join('');
+    document.getElementById('papersSection').style.display = 'none';
+  }
+
+  function render(repos) {
+    const q = document.getElementById('q').value.trim().toLowerCase();
+    const filtered = q
+      ? repos.filter(r =>
+          (r.full_name||'').toLowerCase().includes(q) ||
+          (r.description||'').toLowerCase().includes(q) ||
+          (r.language||'').toLowerCase().includes(q) ||
+          (r.topics||[]).some(t=>t.toLowerCase().includes(q))
+        )
+      : repos;
+
+    const grid = document.getElementById('grid');
+    if (!filtered.length) {
+      grid.innerHTML = `<div class="empty"><div class="empty-ico">🔭</div><h3>No repos found</h3><p>Try a broader filter or different category.</p></div>`;
+      return;
+    }
+    grid.innerHTML = filtered.map(repoCard).join('');
+    document.getElementById('statPill').innerHTML = `<b>${filtered.length}</b> repos`;
+  }
+
+  async function load(forceRefresh=false) {
+    if (loading) return;
+    loading = true;
+    showSkeleton();
+    document.getElementById('cacheTag').style.display = 'none';
+
+    if (forceRefresh) await fetch('/api/cache/clear').catch(()=>{});
+
+    // Handle papers-only tab
+    if (cat === 'papers') {
+      const resp = await fetch(`/api/papers?category=all&period=${period}`).catch(()=>null);
+      loading = false;
+      if (!resp?.ok) { document.getElementById('grid').innerHTML = '<div class="empty"><div class="empty-ico">⚠️</div><h3>Failed to load papers</h3></div>'; return; }
+      const json = await resp.json();
+      document.getElementById('grid').innerHTML = '';
+      const sec = document.getElementById('papersSection');
+      sec.style.display = 'block';
+      document.getElementById('papersGrid').innerHTML = (json.data||[]).map(paperCard).join('');
+      document.getElementById('statPill').innerHTML = `<b>${json.count||0}</b> papers`;
+      document.getElementById('tsLabel').textContent = new Date().toLocaleTimeString();
+      return;
+    }
+
+    try {
+      const resp = await fetch(`/api/trending?period=${period}&category=${cat}&limit=30`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      allRepos = json.data || [];
+      loading = false;
+
+      render(allRepos);
+
+      if (json.cached) document.getElementById('cacheTag').style.display = 'inline';
+      document.getElementById('tsLabel').textContent = new Date().toLocaleTimeString();
+
+      // Always show papers panel below repos (except papers tab)
+      fetchPapers();
+    } catch(err) {
+      loading = false;
+      document.getElementById('grid').innerHTML = `<div class="empty"><div class="empty-ico">⚠️</div><h3>Error: ${err.message}</h3><p>Check that the server is running.</p></div>`;
+    }
+  }
+
+  async function fetchPapers() {
+    try {
+      const resp = await fetch(`/api/papers?category=${cat === 'all' ? 'llm' : cat}&period=${period}`);
+      if (!resp.ok) return;
+      const json = await resp.json();
+      if (!json.data?.length) return;
+      const sec = document.getElementById('papersSection');
+      sec.style.display = 'block';
+      document.getElementById('papersGrid').innerHTML = (json.data||[]).map(paperCard).join('');
+    } catch(e) { /* silent */ }
+  }
+
+  function setCat(c, el) {
+    cat = c;
+    document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    load();
+  }
+
+  function setPeriod(p, el) {
+    period = p;
+    document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    load();
+  }
+
+  function hardRefresh() { load(true); }
+
+  document.getElementById('q').addEventListener('input', () => {
+    if (cat !== 'papers') render(allRepos);
+  });
+
+  // Auto-refresh every 10 minutes
+  setInterval(() => load(false), 600_000);
+
+  // Boot
+  load();
+</script>
+</body>
+</html>

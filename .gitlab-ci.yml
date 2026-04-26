@@ -1,0 +1,31 @@
+stages:
+  - test
+  - deploy
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip/
+
+test:
+  stage: test
+  image: python:3.11-slim
+  before_script:
+    - pip install -r requirements.txt -q
+  script:
+    - python -c "from github_client import search_repos, scrape_trending; print('github_client OK')"
+    - python -c "from perplexity_client import enrich_repos; print('perplexity_client OK')"
+    - python -c "from arxiv_client import search_papers; print('arxiv_client OK')"
+    - python -c "from server import app; print('server OK')"
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
+# Add Railway/Render deploy here when ready
+# deploy:
+#   stage: deploy
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == "main"
+#   script:
+#     - railway up
