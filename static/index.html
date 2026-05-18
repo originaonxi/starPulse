@@ -172,6 +172,45 @@
     /* ── BREAKOUTS ── */
     .breakout-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:8px}
 
+    /* ── LIVE / REAL-TIME ── */
+    .live-hdr{
+      display:flex;align-items:center;gap:10px;margin-bottom:14px;
+      padding:10px 14px;background:rgba(255,123,114,.04);
+      border:1px solid rgba(255,123,114,.2);border-radius:8px;
+    }
+    .live-title{font-size:14px;font-weight:800;color:var(--red)}
+    .live-sub{font-size:11px;color:var(--muted);margin-left:auto}
+    .live-refresh{font-size:10px;color:var(--green);margin-left:8px}
+    .delta-badge{
+      display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;
+      border-radius:10px;white-space:nowrap;
+    }
+    .delta-pos{background:rgba(63,185,80,.12);color:var(--green);border:1px solid rgba(63,185,80,.25)}
+    .delta-zero{background:var(--bg2);color:var(--muted);border:1px solid var(--border)}
+    .delta-6h{background:rgba(88,166,255,.1);color:var(--blue);border:1px solid rgba(88,166,255,.2)}
+    .ntab.live-tab{color:var(--red)}
+    .ntab.live-tab.active{background:rgba(61,21,21,.8);border-color:var(--red);color:var(--red)}
+
+    /* ── TIMELINE / DATE PICKER ── */
+    .date-bar{
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+      margin-bottom:18px;padding:12px 14px;
+      background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+    }
+    .date-bar label{font-size:11px;color:var(--muted);font-weight:600;white-space:nowrap}
+    .date-chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+    .dchip{
+      font-size:11px;padding:4px 10px;border-radius:10px;cursor:pointer;
+      border:1px solid var(--border);color:var(--muted);background:transparent;
+      transition:all .12s;white-space:nowrap;
+    }
+    .dchip:hover{border-color:var(--blue);color:var(--blue)}
+    .dchip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+    .dchip.today{border-color:var(--green);color:var(--green)}
+    .dchip.today.active{background:var(--green);border-color:var(--green);color:#0d1117}
+    .tl-meta{font-size:11px;color:var(--muted);margin-bottom:10px}
+    .tl-meta b{color:var(--text)}
+
     /* ── EMPTY ── */
     .empty{text-align:center;padding:60px 20px;color:var(--muted)}
     .empty .ei{font-size:40px;margin-bottom:10px}
@@ -206,9 +245,11 @@
 <nav class="nav" id="nav">
   <button class="ntab active" data-view="top10" onclick="setView('top10',this)">🏆 Top 10 × 10</button>
   <div class="nav-sep"></div>
+  <button class="ntab live-tab" data-view="live" onclick="setView('live',this)">🔴 Live</button>
   <button class="ntab breakout-tab" data-view="breakouts" onclick="setView('breakouts',this)">🚀 Breakouts</button>
   <button class="ntab" data-view="contributors" onclick="setView('contributors',this)">👑 Contributors</button>
   <button class="ntab" data-view="papers" onclick="setView('papers',this)">📄 Papers</button>
+  <button class="ntab" data-view="timeline" onclick="setView('timeline',this)">📅 Timeline</button>
   <div class="nav-sep"></div>
   <!-- category quick-jumps populated by JS -->
   <span id="catTabs"></span>
@@ -464,6 +505,10 @@ async function setView(view, el) {
     await loadContributors();
   } else if (view === 'papers') {
     await loadPapers();
+  } else if (view === 'timeline') {
+    await loadTimeline();
+  } else if (view === 'live') {
+    await loadLive();
   }
 }
 
@@ -507,9 +552,189 @@ document.getElementById('q').addEventListener('input', function() {
   }, 250);
 });
 
+// ── LIVE / REAL-TIME VIEW ────────────────────────────────────────────────────
+let liveTimer       = null;
+let liveLastUpdated = null;
+
+function liveCard(r) {
+  const lc   = LANG_CLR[r.language] || '#8b949e';
+  const lang = r.language
+    ? `<span class="lang-dot" style="color:${lc};background:${lc}18;border:1px solid ${lc}30">● ${r.language}</span>` : '';
+  const d1h  = r.delta_1h || 0;
+  const d6h  = r.delta_6h || 0;
+  const d24h = r.delta_24h || 0;
+
+  const badge1h  = d1h  > 0 ? `<span class="delta-badge delta-pos">▲ ${fmt(d1h)} /1h</span>` :
+                               `<span class="delta-badge delta-zero">— /1h</span>`;
+  const badge6h  = d6h  > 0 ? `<span class="delta-badge delta-6h">▲ ${fmt(d6h)} /6h</span>` : '';
+  const badge24h = d24h > 0 ? `<span class="delta-badge" style="background:rgba(188,140,255,.1);color:var(--purple);border:1px solid rgba(188,140,255,.25)">▲ ${fmt(d24h)} /24h</span>` : '';
+
+  const why = r.why ? `<div class="rc-why">💡 ${r.why}</div>` : '';
+
+  return `
+  <a class="rcard ${rankClass(r.rank)} ${d1h>0?'bo':''}" href="${r.url||'#'}" target="_blank" rel="noopener noreferrer">
+    <div class="rc-top">
+      <span class="rc-rank ${r.rank>3?'other':''}">${rankLabel(r.rank)}</span>
+      <img class="av" src="${r.owner_avatar||''}" loading="lazy" onerror="this.remove()">
+      <span class="rc-name">${r.full_name}</span>
+      ${lang}
+    </div>
+    <div class="rc-desc">${r.description||'<em style="opacity:.4">No description</em>'}</div>
+    <div class="rc-sig">
+      <span class="sig stars">⭐ <b>${fmt(r.stars)}</b></span>
+      ${badge1h}${badge6h}${badge24h}
+    </div>
+    ${why}
+  </a>`;
+}
+
+async function loadLive(silent=false) {
+  if (!silent) setPageLoading(8);
+
+  try {
+    const resp = await fetch('/api/realtime?limit=100');
+    const j    = await resp.json();
+    const repos = j.data || [];
+    liveLastUpdated = new Date();
+
+    if (j.status === 'no_data') {
+      document.getElementById('page').innerHTML = `
+        <div class="live-hdr">
+          <span class="live-dot"></span>
+          <span class="live-title">🔴 Live AI Tracker</span>
+          <span class="live-sub">Cron starting — first data in ~5 minutes</span>
+        </div>
+        <div class="empty">
+          <div class="ei">⏳</div>
+          <h3>First collection running now</h3>
+          <p style="margin-top:8px;color:var(--muted)">Real-time snapshots are being collected. Refresh in 5 minutes.</p>
+        </div>`;
+      return;
+    }
+
+    const movers   = repos.filter(r => (r.delta_1h||0) > 0);
+    const watching = repos.filter(r => (r.delta_1h||0) === 0);
+    const topGain  = repos[0]?.delta_1h || 0;
+    const timeAgo  = liveLastUpdated ? `updated ${Math.round((Date.now()-liveLastUpdated)/1000)}s ago` : '';
+
+    const movSection = movers.length
+      ? `<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:var(--red)">🔥 GAINING STARS RIGHT NOW (${movers.length})</div>
+         <div class="repo-list" style="margin-bottom:24px">${movers.map(r=>liveCard(r)).join('')}</div>` : '';
+
+    const watchSection = watching.length
+      ? `<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:var(--muted)">👁 WATCHING — no movement in last hour (${watching.length})</div>
+         <div class="repo-list">${watching.slice(0,30).map(r=>liveCard(r)).join('')}</div>` : '';
+
+    document.getElementById('page').innerHTML = `
+      <div class="live-hdr">
+        <span class="live-dot"></span>
+        <span class="live-title">🔴 Live AI Repo Tracker</span>
+        <span class="live-sub">
+          ${repos.length} repos tracked ·
+          ${movers.length} gaining stars now ·
+          top gain: <b style="color:var(--green)">▲${fmt(topGain)}/hr</b>
+        </span>
+        <span class="live-refresh" id="liveAge">${timeAgo}</span>
+      </div>
+      ${movSection}${watchSection}`;
+
+    document.getElementById('statChip').innerHTML =
+      `🔴 <b>${movers.length}</b> moving · <b>${repos.length}</b> tracked`;
+
+  } catch(e) {
+    if (!silent) document.getElementById('page').innerHTML =
+      `<div class="empty"><div class="ei">⚠️</div><h3>${e.message}</h3></div>`;
+  }
+}
+
+function startLiveRefresh() {
+  if (liveTimer) clearInterval(liveTimer);
+  liveTimer = setInterval(async () => {
+    if (currentView === 'live') {
+      await loadLive(true);   // silent reload — don't flash skeleton
+      const el = document.getElementById('liveAge');
+      if (el && liveLastUpdated)
+        el.textContent = `refreshed ${Math.round((Date.now()-liveLastUpdated)/1000)}s ago`;
+    }
+  }, 60000);  // refresh every 60s
+}
+
+// ── TIMELINE (date-wise view) ────────────────────────────────────────────────
+let snapshotDates   = [];
+let activeDate      = null;
+let activePlatform  = 'github';
+
+async function loadTimeline(forceDate, forcePlatform) {
+  // Load available dates once
+  if (!snapshotDates.length) {
+    try {
+      const r = await fetch('/api/snapshot-dates');
+      const j = await r.json();
+      snapshotDates = j.dates || [];
+    } catch(e) { snapshotDates = []; }
+  }
+
+  const platform   = forcePlatform || activePlatform || 'github';
+  activePlatform   = platform;
+  const targetDate = forceDate || activeDate || (snapshotDates[0]?.date) || '2026-05-18';
+  activeDate       = targetDate;
+
+  const today      = snapshotDates[0]?.date || targetDate;
+
+  // Platform toggle buttons
+  const platformToggle = `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+      <label style="font-size:11px;color:var(--muted);font-weight:600">Platform:</label>
+      <button class="dchip ${platform==='github'?'active today':''}" onclick="loadTimeline(activeDate,'github')">🐙 GitHub</button>
+      <button class="dchip ${platform==='gitlab'?'active':''}" onclick="loadTimeline(activeDate,'gitlab')">🦊 GitLab</button>
+    </div>`;
+
+  // Date chips (only show for GitLab since GitHub uses last_updated)
+  const chipsHtml = platform === 'gitlab'
+    ? snapshotDates.map(d => {
+        const isToday = d.date === today;
+        const cls = ['dchip', isToday?'today':'', d.date===activeDate?'active':''].filter(Boolean).join(' ');
+        return `<button class="${cls}" onclick="loadTimeline('${d.date}','gitlab')">${d.date}${isToday?' ✦':''} <span style="opacity:.5;font-size:10px">${d.count}</span></button>`;
+      }).join('')
+    : '';
+
+  const dateBar = platform === 'gitlab'
+    ? `<div class="date-bar"><label>📅 Date:</label><div class="date-chips">${chipsHtml}</div></div>`
+    : `<div class="date-bar" style="gap:6px"><label>📅 GitHub top repos as of</label><b style="color:var(--green)">${targetDate}</b><span style="color:var(--muted);font-size:10px">(ranked by score · 3,000+ repos)</span></div>`;
+
+  // Skeleton
+  document.getElementById('page').innerHTML = `
+    ${platformToggle}${dateBar}
+    ${Array(8).fill('<div class="sk" style="height:90px;margin-bottom:8px"></div>').join('')}`;
+
+  try {
+    const resp = await fetch(`/api/top-by-date?date=${targetDate}&limit=200&platform=${platform}`);
+    const j    = await resp.json();
+    const repos = j.data || [];
+
+    const breakoutCount = repos.filter(r => r.is_breakout).length;
+    const topVel = repos.slice(0,20).reduce((m,r) => Math.max(m, r.delta_7d||0), 0);
+
+    document.getElementById('page').innerHTML = `
+      ${platformToggle}${dateBar}
+      <div class="tl-meta">
+        <b>${repos.length}</b> repos · <b style="color:var(--red)">${breakoutCount} 🚀 breakouts</b>
+        ${topVel ? `· fastest mover <b style="color:var(--green)">▲${fmt(topVel)}/wk</b>` : ''}
+      </div>
+      <div class="repo-list">${repos.map(r => repoCard(r)).join('')}</div>`;
+
+    document.getElementById('statChip').innerHTML =
+      `🐙 <b>${platform==='github'?'GitHub':'GitLab'}</b> · <b>${repos.length}</b> repos`;
+  } catch(e) {
+    document.getElementById('page').innerHTML =
+      `${platformToggle}${dateBar}<div class="empty"><div class="ei">⚠️</div><h3>${e.message}</h3></div>`;
+  }
+}
+
 // Boot
 loadStats();
 loadTop10();
+startLiveRefresh();
 </script>
 </body>
 </html>

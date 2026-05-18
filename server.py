@@ -340,6 +340,186 @@ def top10():
     return {"data": result, "cached": False}
 
 
+@app.get("/api/snapshot-dates")
+def snapshot_dates():
+    import sqlite3
+    con = sqlite3.connect(str(DB_PATH))
+    rows = con.execute(
+        "SELECT DISTINCT snap_date, COUNT(*) as cnt FROM snapshots GROUP BY snap_date ORDER BY snap_date DESC"
+    ).fetchall()
+    con.close()
+    return {"dates": [{"date": r[0], "count": r[1]} for r in rows]}
+
+
+@app.get("/api/top-by-date")
+def top_by_date(
+    date: str      = Query(...),
+    limit: int     = Query(100, le=500),
+    platform: str  = Query("github"),
+):
+    import sqlite3, json as _json
+
+    key = f"topbydate:{date}:{limit}:{platform}"
+    cached = _get(key, CACHE_TTL)
+    if cached:
+        return {"data": cached, "date": date, "count": len(cached), "cached": True}
+
+    con = sqlite3.connect(str(DB_PATH))
+    con.row_factory = sqlite3.Row
+
+    if platform == "gitlab":
+        # GitLab has real snapshots — compute velocity from them
+        rows = con.execute(
+            """
+            SELECT r.full_name, r.platform, r.name, r.description, r.url, r.language,
+                   r.topics, r.categories, r.owner_avatar, r.forks, r.open_issues,
+                   r.insight, r.pushed_at,
+                   s1.stars,
+                   COALESCE(s1.stars - s7.stars, 0) AS delta_7d
+            FROM snapshots s1
+            JOIN repos r ON r.full_name = s1.full_name
+            LEFT JOIN snapshots s7
+                   ON s7.full_name = s1.full_name
+                  AND s7.snap_date = (
+                        SELECT MAX(snap_date) FROM snapshots
+                         WHERE full_name = s1.full_name
+                           AND snap_date <= date(?, '-7 days')
+                      )
+            WHERE s1.snap_date = ?
+            """,
+            (date, date),
+        ).fetchall()
+    else:
+        # GitHub repos: pull from repos table directly (stored delta_7d/score)
+        # Filter to repos updated on or before the requested date
+        rows = con.execute(
+            """
+            SELECT full_name, platform, name, description, url, language,
+                   topics, categories, owner_avatar, stars, forks, open_issues,
+                   insight, pushed_at, delta_7d, score, is_breakout
+            FROM repos
+            WHERE platform = 'github'
+              AND date(last_updated) <= ?
+            ORDER BY score DESC
+            LIMIT ?
+            """,
+            (date, limit),
+        ).fetchall()
+
+    con.close()
+
+    results = []
+    for row in rows:
+        r = dict(row)
+        for f in ("topics", "categories"):
+            if isinstance(r.get(f), str):
+                try:
+                    r[f] = _json.loads(r[f])
+                except Exception:
+                    r[f] = []
+        results.append(r)
+
+    if platform == "gitlab":
+        import math
+        for r in results:
+            stars  = max(r.get("stars") or 1, 1)
+            forks  = max(r.get("forks") or 1, 1)
+            issues = max(r.get("open_issues") or 1, 1)
+            delta  = r.get("delta_7d") or 0
+            r["score"] = round(
+                math.log10(stars) * 1.0
+                + math.log10(forks) * 0.5
+                + math.log10(issues) * 0.25
+                + (delta / stars) * 5.0,
+                4,
+            )
+            r["is_breakout"] = bool(delta > 0 and (delta / max(stars - delta, 1)) > 0.15)
+        results.sort(key=lambda x: x["score"], reverse=True)
+        results = results[:limit]
+
+    for i, r in enumerate(results):
+        r["rank"] = i + 1
+        r["why"] = _why(r)
+
+    _set(key, results)
+    return {"data": results, "date": date, "count": len(results), "cached": False, "platform": platform}
+
+
+@app.get("/api/realtime")
+def realtime(limit: int = Query(60, le=200)):
+    """Top AI repos ranked by star gain in the last hour (from realtime_snapshots)."""
+    key = f"realtime:{limit}"
+    cached = _get(key, 60)  # 1-minute cache
+    if cached:
+        return {"data": cached, "cached": True, "count": len(cached)}
+
+    import sqlite3, json as _json
+
+    con = sqlite3.connect(str(DB_PATH))
+    con.row_factory = sqlite3.Row
+
+    # Check table exists
+    has_rt = con.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='realtime_snapshots'"
+    ).fetchone()
+    if not has_rt:
+        con.close()
+        return {"data": [], "cached": False, "count": 0, "status": "no_data"}
+
+    rows = con.execute(
+        """
+        SELECT  r1.full_name,
+                r1.stars,
+                r1.ts                                    AS last_seen,
+                COALESCE(r1.stars - r2.stars, 0)         AS delta_1h,
+                COALESCE(r1.stars - r6.stars, 0)         AS delta_6h,
+                COALESCE(r1.stars - r24.stars, 0)        AS delta_24h,
+                repos.description,  repos.language,
+                repos.url,          repos.owner_avatar,
+                repos.forks,        repos.score,
+                repos.is_breakout,  repos.categories
+        FROM realtime_snapshots r1
+        LEFT JOIN realtime_snapshots r2
+               ON r2.full_name = r1.full_name
+              AND r2.ts = (SELECT MAX(ts) FROM realtime_snapshots
+                            WHERE full_name = r1.full_name
+                              AND ts < datetime('now','-55 minutes'))
+        LEFT JOIN realtime_snapshots r6
+               ON r6.full_name = r1.full_name
+              AND r6.ts = (SELECT MAX(ts) FROM realtime_snapshots
+                            WHERE full_name = r1.full_name
+                              AND ts < datetime('now','-6 hours'))
+        LEFT JOIN realtime_snapshots r24
+               ON r24.full_name = r1.full_name
+              AND r24.ts = (SELECT MAX(ts) FROM realtime_snapshots
+                             WHERE full_name = r1.full_name
+                               AND ts < datetime('now','-24 hours'))
+        JOIN repos ON repos.full_name = r1.full_name
+        WHERE r1.ts = (SELECT MAX(ts) FROM realtime_snapshots WHERE full_name = r1.full_name)
+        ORDER BY delta_1h DESC, r1.stars DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    con.close()
+
+    results = []
+    for i, row in enumerate(rows):
+        r = dict(row)
+        r["rank"] = i + 1
+        if isinstance(r.get("categories"), str):
+            try:
+                r["categories"] = _json.loads(r["categories"])
+            except Exception:
+                r["categories"] = []
+        r["why"] = _why(r)
+        results.append(r)
+
+    _set(key, results)
+    updated = time.strftime("%Y-%m-%dT%H:%M:%S")
+    return {"data": results, "cached": False, "count": len(results), "updated_at": updated}
+
+
 @app.get("/api/stats")
 def stats():
     try:
