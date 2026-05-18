@@ -257,24 +257,28 @@ TOP10_CATS = [
 
 
 def _why(r: dict) -> str:
-    """Generate a one-line human explanation for why this repo ranks here."""
     parts = []
     if r.get("insight"):
         return r["insight"]
-    if r.get("is_breakout"):
-        parts.append(f"🚀 Breakout — ▲{r['delta_7d']:,} stars this week")
-    if r.get("delta_7d", 0) > 500:
-        parts.append(f"▲{r['delta_7d']:,}/wk momentum")
-    if r.get("forks", 0) > 20000:
-        parts.append(f"🍴 {r['forks']:,} forks — devs build on it")
-    elif r.get("forks", 0) > 5000:
-        parts.append(f"🍴 {r['forks']:,} forks")
-    if r.get("stars", 0) > 100000:
-        parts.append(f"⭐ {r['stars']:,} stars — industry standard")
-    elif r.get("stars", 0) > 50000:
-        parts.append(f"⭐ {r['stars']:,} stars — widely adopted")
+    d7 = r.get("delta_7d") or 0
+    if r.get("is_breakout") and d7:
+        parts.append(f"🚀 Breakout — ▲{d7:,} stars this week")
+    elif r.get("is_breakout"):
+        parts.append("🚀 Breakout — unusual star velocity")
+    if d7 > 500:
+        parts.append(f"▲{d7:,}/wk momentum")
+    forks = r.get("forks") or 0
+    stars = r.get("stars") or 0
+    if forks > 20000:
+        parts.append(f"🍴 {forks:,} forks — devs build on it")
+    elif forks > 5000:
+        parts.append(f"🍴 {forks:,} forks")
+    if stars > 100000:
+        parts.append(f"⭐ {stars:,} — industry standard")
+    elif stars > 50000:
+        parts.append(f"⭐ {stars:,} — widely adopted")
     if not parts:
-        parts.append(f"Top-ranked in category by score {r.get('score', 0):.1f}")
+        parts.append(f"Score {r.get('score', 0):.1f}")
     return " · ".join(parts[:2])
 
 
@@ -445,6 +449,155 @@ def top_by_date(
     return {"data": results, "date": date, "count": len(results), "cached": False, "platform": platform}
 
 
+FRONTIER_ORGS = {
+    "openai","anthropics","google-deepmind","facebookresearch","mistralai",
+    "deepseek-ai","xai-org","huggingface","EleutherAI","allenai","stabilityai",
+    "microsoft","google","apple","cohere-ai","HKUDS","NousResearch",
+}
+
+
+def _rocket_signals(r: dict) -> tuple[float, list[str]]:
+    """
+    Score a repo like a quant scores a stock.
+    Returns (rocket_score 0-100, [signal_tags]).
+
+    Signals:
+      BREAKOUT   — >15% star growth this week (breaks resistance level)
+      MOMENTUM   — >500 stars/wk sustained (trending channel up)
+      VELOCITY   — delta_7d/stars > 5% (high relative velocity)
+      BUILDER    — forks/stars > 12% (devs building on it = real value)
+      SWEET_SPOT — 1K-30K stars (massive upside headroom)
+      EARLY      — created < 12 months ago (still in price discovery)
+      FRONTIER   — backed by top lab (institutional quality signal)
+      ACTIVE     — pushed within 7 days (not dead)
+    """
+    import math
+    from datetime import datetime, timezone
+
+    stars  = max(r.get("stars") or 0, 1)
+    forks  = r.get("forks") or 0
+    d7     = r.get("delta_7d") or 0
+    score  = 0.0
+    sigs: list[str] = []
+
+    # Velocity as % of base (like % move on a stock)
+    vel_pct = d7 / stars
+    if vel_pct > 0.15:
+        score += 30; sigs.append("BREAKOUT")
+    elif vel_pct > 0.05:
+        score += 20; sigs.append("VELOCITY")
+    elif vel_pct > 0.02:
+        score += 10; sigs.append("MOMENTUM")
+
+    # Raw weekly velocity
+    if d7 > 2000:
+        score += 15; sigs.append("HIGH_VOL") if "HIGH_VOL" not in sigs else None
+    elif d7 > 500 and "MOMENTUM" not in sigs:
+        score += 8; sigs.append("MOMENTUM")
+
+    # Fork ratio — builders > watchers
+    fork_ratio = forks / stars
+    if fork_ratio > 0.20:
+        score += 20; sigs.append("BUILDER")
+    elif fork_ratio > 0.12:
+        score += 12; sigs.append("BUILDER")
+    elif fork_ratio > 0.06:
+        score += 6
+
+    # Sweet spot: 1K-30K stars = huge upside
+    if 1_000 <= stars <= 30_000:
+        score += 15; sigs.append("SWEET_SPOT")
+    elif 30_001 <= stars <= 80_000:
+        score += 8
+
+    # Frontier lab backing
+    owner = (r.get("full_name") or "").split("/")[0]
+    if owner in FRONTIER_ORGS:
+        score += 10; sigs.append("FRONTIER")
+
+    # Recent activity (dev is active = company is alive)
+    pushed = (r.get("pushed_at") or "")[:10]
+    if pushed:
+        try:
+            days_ago = (datetime.now(timezone.utc) - datetime.fromisoformat(pushed + "T00:00:00+00:00")).days
+            if days_ago <= 7:
+                score += 10; sigs.append("ACTIVE")
+            elif days_ago <= 30:
+                score += 5
+        except Exception:
+            pass
+
+    return round(score, 1), sigs
+
+
+@app.get("/api/rockets")
+def rockets(
+    min_stars: int = Query(500,  ge=0),
+    max_stars: int = Query(80_000, le=500_000),
+    limit:     int = Query(50, le=200),
+):
+    """
+    Stock-pattern repo detector.
+    Finds AI repos that look like they will 5-10x — high velocity,
+    builder signal, sweet-spot size, frontier-lab backing.
+    """
+    key = f"rockets:{min_stars}:{max_stars}:{limit}"
+    cached = _get(key, CACHE_TTL)
+    if cached:
+        return {"data": cached, "cached": True, "count": len(cached)}
+
+    import sqlite3, json as _json
+
+    con = sqlite3.connect(str(DB_PATH))
+    con.row_factory = sqlite3.Row
+    rows = con.execute(
+        """
+        SELECT full_name, platform, name, description, url, language,
+               topics, categories, owner_avatar, stars, forks, open_issues,
+               delta_7d, delta_30d, score, is_breakout, insight,
+               pushed_at, created_at, last_updated
+        FROM repos
+        WHERE platform = 'github'
+          AND stars BETWEEN ? AND ?
+          AND (
+              delta_7d > 50
+              OR is_breakout = 1
+              OR CAST(forks AS REAL) / MAX(stars, 1) > 0.06
+          )
+        ORDER BY score DESC
+        LIMIT 500
+        """,
+        (min_stars, max_stars),
+    ).fetchall()
+    con.close()
+
+    results = []
+    for row in rows:
+        r = dict(row)
+        for f in ("topics", "categories"):
+            if isinstance(r.get(f), str):
+                try:
+                    r[f] = _json.loads(r[f])
+                except Exception:
+                    r[f] = []
+
+        rscore, signals = _rocket_signals(r)
+        if rscore < 10:
+            continue
+        r["rocket_score"] = rscore
+        r["signals"]      = signals
+        r["why"]          = _why(r)
+        results.append(r)
+
+    results.sort(key=lambda x: x["rocket_score"], reverse=True)
+    results = results[:limit]
+    for i, r in enumerate(results):
+        r["rank"] = i + 1
+
+    _set(key, results)
+    return {"data": results, "cached": False, "count": len(results)}
+
+
 @app.get("/api/realtime")
 def realtime(limit: int = Query(60, le=200)):
     """Top AI repos ranked by star gain in the last hour (from realtime_snapshots)."""
@@ -477,7 +630,8 @@ def realtime(limit: int = Query(60, le=200)):
                 repos.description,  repos.language,
                 repos.url,          repos.owner_avatar,
                 repos.forks,        repos.score,
-                repos.is_breakout,  repos.categories
+                repos.is_breakout,  repos.categories,
+                repos.delta_7d
         FROM realtime_snapshots r1
         LEFT JOIN realtime_snapshots r2
                ON r2.full_name = r1.full_name

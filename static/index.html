@@ -169,8 +169,43 @@
       padding:5px 8px;border-radius:4px;line-height:1.4;margin-bottom:6px}
     .pbadge{font-size:10px;padding:2px 7px;border-radius:4px;border:1px solid var(--border);color:var(--muted)}
 
-    /* ── BREAKOUTS ── */
-    .breakout-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:8px}
+    /* ── BREAKOUTS / ROCKETS ── */
+    .breakout-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px}
+    .rocket-card{
+      background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+      padding:13px 15px 12px;display:flex;flex-direction:column;gap:7px;
+      text-decoration:none;color:inherit;
+      transition:border-color .14s,transform .14s,box-shadow .14s;position:relative;
+    }
+    .rocket-card:hover{border-color:rgba(88,166,255,.5);transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.5)}
+    .rocket-card.rs-top{border-top:2px solid var(--green)}
+    .rocket-card.rs-mid{border-top:2px solid var(--orange)}
+    .rc-score-bar{
+      position:absolute;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));
+      border-radius:10px 10px 0 0;
+    }
+    .sig-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
+    .sig-tag{
+      font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;letter-spacing:.4px;
+    }
+    .sig-tag.BREAKOUT{background:rgba(255,123,114,.15);color:var(--red);border:1px solid rgba(255,123,114,.3)}
+    .sig-tag.VELOCITY{background:rgba(63,185,80,.12);color:var(--green);border:1px solid rgba(63,185,80,.25)}
+    .sig-tag.MOMENTUM{background:rgba(63,185,80,.08);color:var(--green);border:1px solid rgba(63,185,80,.15)}
+    .sig-tag.BUILDER{background:rgba(88,166,255,.1);color:var(--blue);border:1px solid rgba(88,166,255,.2)}
+    .sig-tag.SWEET_SPOT{background:rgba(227,179,65,.1);color:var(--yellow);border:1px solid rgba(227,179,65,.25)}
+    .sig-tag.FRONTIER{background:rgba(188,140,255,.12);color:var(--purple);border:1px solid rgba(188,140,255,.25)}
+    .sig-tag.ACTIVE{background:rgba(63,185,80,.07);color:var(--green);border:1px solid rgba(63,185,80,.12)}
+    .sig-tag.HIGH_VOL{background:rgba(240,136,62,.12);color:var(--orange);border:1px solid rgba(240,136,62,.25)}
+    .rocket-score{
+      font-size:22px;font-weight:900;line-height:1;
+    }
+    .rocket-score.s-high{color:var(--green)}
+    .rocket-score.s-mid{color:var(--orange)}
+    .rocket-score.s-low{color:var(--muted)}
+    .upside-tag{
+      font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;
+      background:rgba(63,185,80,.08);color:var(--green);border:1px solid rgba(63,185,80,.2);
+    }
 
     /* ── LIVE / REAL-TIME ── */
     .live-hdr{
@@ -413,24 +448,104 @@ function makeWhy(r) {
   return parts.slice(0,2).join(' · ');
 }
 
-// ── BREAKOUTS ────────────────────────────────────────────────────────────────
-async function loadBreakouts() {
-  setPageLoading(4);
-  const resp = await fetch('/api/breakouts?limit=50');
-  const j    = await resp.json();
-  const repos = (j.data||[]).map((r,i)=>({...r,rank:i+1,why:makeWhy(r)}));
-  if (!repos.length) {
-    document.getElementById('page').innerHTML = `<div class="empty"><div class="ei">🚀</div><h3>No breakouts yet — check back tomorrow</h3></div>`;
-    return;
-  }
-  document.getElementById('page').innerHTML = `
-    <div class="cat-hdr" style="margin-bottom:14px">
-      <span class="cat-icon">🚀</span>
-      <span class="cat-title">Breakout Repos — gaining 15%+ stars this week</span>
-      <div class="cat-meta"><span class="cat-pill">${repos.length} breakouts</span></div>
+// ── ROCKETS / BREAKOUTS (stock-pattern detector) ─────────────────────────────
+function rocketCard(r) {
+  const rs    = r.rocket_score || 0;
+  const rsClass = rs >= 60 ? 'rs-top' : rs >= 35 ? 'rs-mid' : '';
+  const rsLabel = rs >= 60 ? 's-high' : rs >= 35 ? 's-mid' : 's-low';
+  const barW  = Math.min(rs, 100) + '%';
+  const lc    = LANG_CLR[r.language] || '#8b949e';
+  const lang  = r.language
+    ? `<span class="lang-dot" style="color:${lc};background:${lc}18;border:1px solid ${lc}30">● ${r.language}</span>` : '';
+
+  const sigHtml = (r.signals||[]).map(s =>
+    `<span class="sig-tag ${s}">${s.replace('_',' ')}</span>`
+  ).join('');
+
+  const d7     = r.delta_7d || 0;
+  const vel    = d7 > 0 ? `<span class="vel-badge ${d7>2000?'hot':''}">▲ ${fmt(d7)}/wk</span>` : '';
+  const forkRatio = r.forks && r.stars ? ((r.forks/r.stars)*100).toFixed(0) : 0;
+  const upsideLabel = r.stars < 5000   ? '🚀 100x potential' :
+                      r.stars < 15000  ? '🔥 10x potential'  :
+                      r.stars < 40000  ? '📈 5x potential'   : '📊 Established';
+
+  const why = r.why ? `<div class="rc-why">💡 ${r.why}</div>` : '';
+
+  return `
+  <a class="rocket-card ${rsClass}" href="${r.url}" target="_blank" rel="noopener noreferrer">
+    <div class="rc-score-bar" style="width:${barW}"></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div>
+        <div class="rocket-score ${rsLabel}">${rs}</div>
+        <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:1px">SCORE</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+          <img class="av" src="${r.owner_avatar||''}" loading="lazy" onerror="this.remove()">
+          <span style="font-size:12px;font-weight:700;color:var(--blue);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.full_name}</span>
+          ${lang}
+        </div>
+        <div class="sig-tags">${sigHtml}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <span class="upside-tag">${upsideLabel}</span>
+      </div>
     </div>
-    <div class="breakout-grid">${repos.map(r=>repoCard(r)).join('')}</div>`;
-  document.getElementById('statChip').innerHTML = `<b>${repos.length}</b> breakouts`;
+    <div class="rc-desc">${r.description||'<em style="opacity:.4">No description</em>'}</div>
+    <div class="rc-sig">
+      <span class="sig stars">⭐ <b>${fmt(r.stars)}</b></span>
+      <span class="sig forks">🍴 <b>${fmt(r.forks)}</b> <span style="opacity:.5;font-size:10px">(${forkRatio}% ratio)</span></span>
+      ${r.open_issues>0?`<span class="sig">🐛 <b>${fmt(r.open_issues)}</b></span>`:''}
+      ${vel}
+    </div>
+    ${why}
+  </a>`;
+}
+
+async function loadBreakouts() {
+  setPageLoading(6);
+  try {
+    const resp = await fetch('/api/rockets?min_stars=300&max_stars=100000&limit=100');
+    const j    = await resp.json();
+    const repos = j.data || [];
+
+    if (!repos.length) {
+      document.getElementById('page').innerHTML =
+        `<div class="empty"><div class="ei">🚀</div><h3>No rockets found — cron is building signal data</h3></div>`;
+      return;
+    }
+
+    // Bucket by signal strength
+    const tier1 = repos.filter(r => r.rocket_score >= 60);
+    const tier2 = repos.filter(r => r.rocket_score >= 35 && r.rocket_score < 60);
+    const tier3 = repos.filter(r => r.rocket_score < 35);
+
+    const section = (title, color, emoji, items) => items.length === 0 ? '' : `
+      <div style="margin-bottom:6px;margin-top:20px;font-size:12px;font-weight:800;color:${color}">${emoji} ${title} (${items.length})</div>
+      <div class="breakout-grid" style="margin-bottom:4px">${items.map(r=>rocketCard(r)).join('')}</div>`;
+
+    document.getElementById('page').innerHTML = `
+      <div class="cat-hdr" style="margin-bottom:6px;padding:12px 14px;background:rgba(63,185,80,.03);border:1px solid rgba(63,185,80,.15);border-radius:8px">
+        <span class="cat-icon">🚀</span>
+        <span class="cat-title" style="color:var(--green)">Rocket Detector — Stock-Pattern AI Repos</span>
+        <div class="cat-meta" style="font-size:11px;color:var(--muted)">
+          Scored like stocks: velocity · momentum · builder ratio · upside room · frontier backing
+          <span class="cat-pill" style="margin-left:8px">${repos.length} candidates</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px;padding:0 2px">
+        Score = velocity% + fork ratio + breakout + sweet-spot size + lab backing + activity
+      </div>
+      ${section('STRONG BUY — Score 60+','var(--green)','🟢', tier1)}
+      ${section('WATCH — Score 35-59','var(--orange)','🟡', tier2)}
+      ${section('ON RADAR — Score <35','var(--muted)','⚪', tier3)}`;
+
+    document.getElementById('statChip').innerHTML =
+      `🚀 <b>${tier1.length}</b> strong · <b>${tier2.length}</b> watch · <b>${tier3.length}</b> radar`;
+  } catch(e) {
+    document.getElementById('page').innerHTML =
+      `<div class="empty"><div class="ei">⚠️</div><h3>${e.message}</h3></div>`;
+  }
 }
 
 // ── CONTRIBUTORS ─────────────────────────────────────────────────────────────
